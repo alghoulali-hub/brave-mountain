@@ -286,7 +286,7 @@ function giftsTab() {
       <button class="btn sm primary" data-act="addSummit">Add</button></div></section>
     <section class="card"><span class="h3">Prize shop</span><span class="small muted">Keep prices steady. Daily prizes should be reachable every day.</span>
       ${state.d.rewards.map(r => `<div class="col" style="gap:6px;padding:10px 0;border-top:1px solid var(--line)">
-        <input class="input" id="rn-${r.id}" value="${esc(r.name)}" aria-label="Prize name">
+        <textarea class="input step-text" id="rn-${r.id}" rows="1" style="min-height:48px;resize:none;line-height:1.35" aria-label="Prize name">${esc(r.name)}</textarea>
         <div class="row"><input class="input" id="rp-${r.id}" type="number" inputmode="numeric" value="${r.price}" style="width:90px" aria-label="Price">
           <select class="input" id="rt-${r.id}" style="width:auto" aria-label="Type"><option value="daily" ${r.tier === 'daily' ? 'selected' : ''}>Daily</option><option value="weekly" ${r.tier === 'weekly' ? 'selected' : ''}>Weekly</option></select>
           <label class="row small bold" style="gap:4px"><input type="checkbox" id="ra-${r.id}" ${r.active ? 'checked' : ''}> On</label></div>
@@ -302,7 +302,7 @@ function giftsTab() {
 function settingsTab() {
   const f = state.family; const kidP = childProfile();
   const missionRow = m => `<div class="col" style="gap:6px;padding:10px 0;border-top:1px solid var(--line)">
-    <input class="input" id="mt-${m.id}" value="${esc(m.title)}" aria-label="Mission name">
+    <textarea class="input step-text" id="mt-${m.id}" rows="1" style="min-height:48px;resize:none;line-height:1.35" aria-label="Mission name">${esc(m.title)}</textarea>
     <div class="row"><label class="small bold">Points <input class="input" id="mp-${m.id}" type="number" inputmode="numeric" value="${m.points}" style="width:76px"></label>
       ${m.kind === 'behaviour' ? `<label class="small bold">Check-ins <input class="input" id="mc-${m.id}" type="number" inputmode="numeric" value="${m.checkins}" min="1" max="5" style="width:70px"></label>` : ''}
       <button class="btn sm primary" data-act="saveMission" data-m="${m.id}">Save</button><button class="icon-btn" style="background:var(--soft)" data-act="delMission" data-m="${m.id}" aria-label="Delete">${ic.trash(16)}</button></div></div>`;
@@ -378,7 +378,13 @@ export function parentModal(m) {
       ${custom ? `<div class="field"><label for="path-title">Path name</label><input class="input" id="path-title" value="${esc(m.title ?? l?.title ?? '')}" placeholder="e.g. Health path"></div>` : ''}
       ${m.newPath ? `<div class="field"><label>Start from</label><div class="seg">${Object.entries(TEMPLATES).map(([k, t]) => `<button data-act="pathTemplate" data-v="${k}" class="${m.template === k ? 'on' : ''}">${t.label}</button>`).join('')}</div></div>` : ''}
       <span class="small muted">Steps from easiest to hardest. Write {P} where you want "${esc(P())}".</span>
-      ${rows.map((r, i) => `<div class="row"><span class="bold small" style="width:24px">${i + 1}</span><input class="input grow" data-step-input="${i}" value="${esc(r.title)}" aria-label="Step ${i + 1}">${rows.length > 1 ? `<button class="icon-btn" style="background:var(--soft)" data-act="stepDel" data-i="${i}" aria-label="Remove step">${ic.trash(16)}</button>` : ''}</div>`).join('')}
+      ${rows.map((r, i) => `<div class="row top" style="gap:8px"><span class="bold small" style="width:20px;padding-top:14px">${i + 1}</span>
+        <textarea class="input grow step-text" data-step-input="${i}" rows="2" style="min-height:52px;resize:none;line-height:1.35" aria-label="Step ${i + 1}">${esc(r.title)}</textarea>
+        <div class="col" style="gap:4px">
+          <button class="icon-btn" style="background:var(--soft);width:36px;height:36px" data-act="stepMove" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move step ${i + 1} up">${ic.up(14)}</button>
+          <button class="icon-btn" style="background:var(--soft);width:36px;height:36px;transform:rotate(180deg)" data-act="stepMove" data-i="${i}" data-d="1" ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Move step ${i + 1} down">${ic.up(14)}</button>
+          ${rows.length > 1 ? `<button class="icon-btn" style="background:var(--soft);width:36px;height:36px" data-act="stepDel" data-i="${i}" aria-label="Remove step ${i + 1}">${ic.trash(14)}</button>` : ''}</div></div>`).join('')}
+      ${!m.newPath && currentStep(l) ? `<span class="tiny muted">The current camp stays the same step when you reorder. Steps placed above it count as climbed.</span>` : ''}
       <button class="btn sm ghost" data-act="stepAdd">${ic.plus(16)} Add a step</button>
       <button class="btn primary" data-act="stepsSave">${m.newPath ? 'Create path' : 'Save steps'}</button>
       ${!m.newPath ? `<button class="btn ghost" data-act="managePaths">Rename, reorder, hide or delete paths</button>` : ''}</div>`;
@@ -394,7 +400,7 @@ const TEMPLATES = {
 function draftFromInputs() {
   const t = document.getElementById('path-title'); if (t) state.modal.title = t.value;
   const rows = state.modal.draft || stepsOf(ladder(ui().path) || paths()[0]).map(s => ({ id: s.id, title: s.title }));
-  document.querySelectorAll('[data-step-input]').forEach(inp => { rows[+inp.dataset.stepInput].title = inp.value; });
+  document.querySelectorAll('[data-step-input]').forEach(inp => { rows[+inp.dataset.stepInput].title = inp.value.replace(/\s*\n\s*/g, ' '); });
   return rows;
 }
 
@@ -491,6 +497,7 @@ export const parentActions = {
   async saveGrand(el) { await run(sb.from('gifts').update({ title: val('grand-title') }).eq('id', el.dataset.g), 'Saved'); await reload(); },
   async summitGiven(el) { await run(sb.from('gifts').update({ status: 'given' }).eq('id', el.dataset.g), 'Marked as given'); await reload(); },
   stepAdd: () => { const d = draftFromInputs(); d.push({ id: null, title: '' }); state.modal.draft = d; render(); },
+  stepMove: el => { const d = draftFromInputs(); const i = +el.dataset.i, j = i + parseInt(el.dataset.d, 10); if (j < 0 || j >= d.length) return; [d[i], d[j]] = [d[j], d[i]]; state.modal.draft = d; render(); },
   stepDel: el => { const d = draftFromInputs(); d.splice(+el.dataset.i, 1); state.modal.draft = d; render(); },
   async stepsSave() {
     const draft = draftFromInputs(); const rows = draft.filter(r => r.title.trim());
@@ -508,6 +515,7 @@ export const parentActions = {
     if (state.modal.title && state.modal.title.trim() && state.modal.title.trim() !== l.title)
       await run(sb.from('ladders').update({ title: state.modal.title.trim() }).eq('id', l.id));
     const old = stepsOf(l);
+    const curId = currentStep(l)?.id;
     // move existing to temporary positions to avoid clashes, then write the final order
     for (const s of old) await run(sb.from('ladder_steps').update({ position: s.position + 1000 }).eq('id', s.id));
     const keep = new Set();
@@ -517,7 +525,9 @@ export const parentActions = {
       else await run(sb.from('ladder_steps').insert({ family_id: fam(), ladder_id: l.id, position: i + 1, title: r.title.trim() }));
     }
     for (const s of old) if (!keep.has(s.id)) await run(sb.from('ladder_steps').delete().eq('id', s.id));
-    if (l.current_position > rows.length + 1) await run(sb.from('ladders').update({ current_position: rows.length + 1 }).eq('id', l.id));
+    const newCur = curId ? rows.findIndex(r => r.id === curId) : -1;
+    if (newCur >= 0 && newCur + 1 !== l.current_position) await run(sb.from('ladders').update({ current_position: newCur + 1 }).eq('id', l.id));
+    else if (newCur < 0 && l.current_position > rows.length + 1) await run(sb.from('ladders').update({ current_position: rows.length + 1 }).eq('id', l.id));
     closeModal(); toast('Steps saved'); await reload();
   },
   async cycleAcc(el) { const a = state.d.accommodations.find(x => x.id === el.dataset.a); const next = { now: 'done', next: 'now', done: 'next' }[a.status]; await run(sb.from('accommodations').update({ status: next }).eq('id', a.id)); await reload(); },
@@ -550,7 +560,7 @@ export const parentActions = {
     const id = el.dataset.r;
     const price = parseInt(val('rp-' + id), 10);
     if (!(price > 0)) return toast('Price must be more than 0');
-    await run(sb.from('rewards').update({ name: val('rn-' + id), price, tier: val('rt-' + id), active: document.getElementById('ra-' + id).checked }).eq('id', id), 'Saved'); await reload();
+    await run(sb.from('rewards').update({ name: val('rn-' + id).replace(/\s*\n\s*/g, ' '), price, tier: val('rt-' + id), active: document.getElementById('ra-' + id).checked }).eq('id', id), 'Saved'); await reload();
   },
   async delReward(el) { await run(sb.from('rewards').delete().eq('id', el.dataset.r)); await reload(); },
   async addReward() {
@@ -598,7 +608,7 @@ export const parentActions = {
   },
   async saveMission(el) {
     const id = el.dataset.m; const m = state.d.missions.find(x => x.id === id);
-    const patch = { title: val('mt-' + id), points: parseInt(val('mp-' + id), 10) || 0 };
+    const patch = { title: val('mt-' + id).replace(/\s*\n\s*/g, ' '), points: parseInt(val('mp-' + id), 10) || 0 };
     if (m.kind === 'behaviour') patch.checkins = Math.min(5, Math.max(1, parseInt(val('mc-' + id), 10) || 1));
     await run(sb.from('missions').update(patch).eq('id', id), 'Saved'); await reload();
   },

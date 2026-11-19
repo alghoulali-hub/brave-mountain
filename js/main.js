@@ -41,6 +41,9 @@ async function start() {
   };
 
   let acting = false;
+  // long step / mission / prize names: grow the box so the whole text shows
+  const fitText = t => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 4) + 'px'; };
+  document.addEventListener('input', ev => { if (ev.target.matches && ev.target.matches('textarea.step-text')) fitText(ev.target); });
   function render() {
     // keep what the person is typing when live updates re-draw the screen
     const keep = {};
@@ -69,6 +72,7 @@ async function start() {
 
     Object.entries(keep).forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus({ preventScroll: true }); try { if (selStart != null) el.setSelectionRange(selStart, selEnd); } catch {} } }
+    root.querySelectorAll('textarea.step-text').forEach(fitText);
     const newModal = root.querySelector('.modal'); if (newModal && modalScroll) newModal.scrollTop = modalScroll;
   }
   setRenderer(render);

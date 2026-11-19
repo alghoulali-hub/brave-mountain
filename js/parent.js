@@ -12,6 +12,11 @@ const ui = () => (state.ui.par ||= { path: 'school', range: 'week' });
 const val = id => (document.getElementById(id)?.value ?? '').trim();
 const fam = () => state.profile.family_id;
 const reload = async () => { await loadAll(); render(); };
+// The day being filled in on the Today tab (today, or up to 3 days back)
+const BACK_DAYS = 6; // today + the 6 days before = one week
+const selDay = () => { const d = ui().day; return d && d >= addDays(today(), -BACK_DAYS) && d <= today() ? d : today(); };
+const attemptOn = (step, day) => { const l = state.d.attempts.filter(a => a.step_id === step.id && a.attempt_date === day); return l[l.length - 1] || null; };
+const noonOf = day => new Date(day + 'T12:00:00').toISOString();
 
 export function parentView() {
   const tab = state.tab || 'today';
@@ -28,7 +33,12 @@ const head = (title, sub = '') => `<header class="col tight"><span class="row be
 
 // ───────── Today ─────────
 function todayTab() {
-  const t = today();
+  const t = selDay();
+  const isToday = t === today();
+  const dayLabel = d => d === today() ? 'Today' : d === addDays(today(), -1) ? 'Yesterday' : new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+  const dayPicker = `<div class="row" style="gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch" role="tablist" aria-label="Day">${Array.from({ length: BACK_DAYS + 1 }, (_, i) => { const d = addDays(today(), -i); const filled = state.d.attendance.some(a => a.day === d) || state.d.logs.some(l => l.log_date === d); return `<button role="tab" class="pill ${d === t ? 'on' : ''}" style="flex-shrink:0" data-act="pickDay" data-v="${d}" aria-selected="${d === t}">${dayLabel(d)}${filled || d === today() ? '' : ' ·'}</button>`; }).join('')}</div>
+    <span class="tiny muted" style="margin-top:-10px">Missed a day? Pick it to fill it in. Days marked · have nothing recorded yet.</span>
+    ${isToday ? '' : `<div class="card" style="background:#FFF6E3;box-shadow:none;flex-direction:row;align-items:center;gap:10px">${ic.today(20, 'var(--sun-ink)')}<span class="small bold grow">Filling in ${new Date(t + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}. Points are dated to that day.</span><button class="btn sm ghost" data-act="pickDay" data-v="${today()}">Back to today</button></div>`}`;
   const att = attendanceOn(t);
   const pendingAttempts = state.d.attempts.filter(a => a.result == null);
   const confirmCards = pendingAttempts.map(a => {
@@ -48,7 +58,7 @@ function todayTab() {
     const top = !currentStep(l);
     const s = currentStep(l) || stepsOf(l).slice(-1)[0];
     if (!s) return '';
-    const a = todaysAttempt(s);
+    const a = attemptOn(s, t);
     if (a) {
       const label = a.result ? { done: 'Done · +30', tried: 'Tried · +10', not: 'Not today' }[a.result] : 'Waiting for your confirmation above';
       return `<div class="row between small"><span class="bold">${esc(l.title)}: ${top ? 'Top (keep it up)' : 'Camp ' + s.position}</span><span class="muted bold">${label}</span></div>`;
@@ -60,7 +70,7 @@ function todayTab() {
   }).join('<div class="divider"></div>');
 
   const behaviour = behaviourMissions().map(m => {
-    const logs = logsFor(m);
+    const logs = logsFor(m, t);
     const names = m.checkins === 3 ? ['After school', 'Afternoon', 'Bedtime'] : Array.from({ length: m.checkins }, (_, i) => `Check ${i + 1}`);
     return `<div class="col"><div class="row between"><span class="bold">${esc(m.title)}</span><span class="small muted bold">+${m.points} each</span></div>
       <div class="grid3">${names.map((n, i) => {
@@ -72,9 +82,9 @@ function todayTab() {
   }).join('');
 
   const routine = routineMissions();
-  const pendingLogs = routine.flatMap(m => logsFor(m).filter(l => l.status === 'pending'));
+  const pendingLogs = routine.flatMap(m => logsFor(m, t).filter(l => l.status === 'pending'));
   const routineRow = m => {
-    const l = logsFor(m)[0];
+    const l = logsFor(m, t)[0];
     return `<div class="row"><span class="grow small bold">${esc(m.title)}</span>
       ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}">Mark done</button>` :
         l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button>` :
@@ -82,8 +92,8 @@ function todayTab() {
   };
   const routineRows = PARTS.map(([part, label]) => {
     const list = routineMissions(part); if (!list.length) return '';
-    const done = list.filter(m => logsFor(m)[0]).length;
-    return `<div class="row between" style="margin-top:4px"><span class="small bold" style="color:var(--primary)">${label}${part === currentPart() ? ' · now' : ''}</span><span class="tiny muted bold">${done}/${list.length}</span></div>${list.map(routineRow).join('')}`;
+    const done = list.filter(m => logsFor(m, t)[0]).length;
+    return `<div class="row between" style="margin-top:4px"><span class="small bold" style="color:var(--primary)">${label}${isToday && part === currentPart() ? ' · now' : ''}</span><span class="tiny muted bold">${done}/${list.length}</span></div>${list.map(routineRow).join('')}`;
   }).join('<div class="divider"></div>');
 
   const claimed = state.d.redemptions.filter(r => r.status === 'claimed');
@@ -93,26 +103,27 @@ function todayTab() {
   const kidReplies = hearts.filter(h => h.from_role === 'child').length;
   const plan = state.family.checkins_per_day;
 
-  return `${head(`${esc(kid())} today`, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}
-    <div class="card" style="flex-direction:row;align-items:center"><div class="grow col tight"><span class="small muted bold">Earned today</span><span class="display" style="font-size:28px;color:var(--primary)">+${earnedOn(t)}</span></div>
+  return `${head(`${esc(kid())} ${isToday ? 'today' : '· ' + dayLabel(t)}`, new Date(t + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}
+    ${dayPicker}
+    <div class="card" style="flex-direction:row;align-items:center"><div class="grow col tight"><span class="small muted bold">Earned ${isToday ? 'today' : 'that day'}</span><span class="display" style="font-size:28px;color:var(--primary)">+${earnedOn(t)}</span></div>
       <div class="col tight" style="align-items:flex-end"><span class="small muted bold">Balance</span><span class="display" style="font-size:22px">${state.d.balance}</span></div></div>
-    ${state.ui.push && state.ui.push !== 'on' ? pushCard('parent') : ''}
+    ${isToday && state.ui.push && state.ui.push !== 'on' ? pushCard('parent') : ''}
     ${confirmCards}
-    <section class="card"><span class="h3">School today</span>
+    <section class="card"><span class="h3">School ${isToday ? 'today' : 'that day'}</span>
       <div class="grid3">${[['went', 'Went', '+20'], ['partly', 'Part of day', '+10'], ['no', "Didn't go", '0']].map(([v, l, p]) =>
         `<button class="choice ${att?.status === v ? 'on' : ''}" data-act="setSchool" data-v="${v}" aria-pressed="${att?.status === v}"><span>${l}</span><span class="tiny">${p}</span></button>`).join('')}</div>
       ${att?.status === 'no' ? `<span class="small muted bold">No points lost. Tomorrow is a fresh start.</span>` : ''}
       <div class="divider"></div><span class="h3">Brave steps</span>${recordRows}
     </section>
     ${behaviour ? `<section class="card">${behaviour}</section>` : ''}
-    ${parentFoodCard()}
+    ${parentFoodCard(t)}
     <section class="card"><div class="row between"><span class="h3">Routines</span>${pendingLogs.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>${routineRows || '<span class="small muted">No routine steps</span>'}</section>
     <section class="col"><span class="h3">Quick bonus</span>
       <div class="grid2">${[['Brave moment', 10], ['Calmed down', 5], ['Kind act', 5], ['Tried something hard', 5]].map(([l, p]) =>
         `<button class="card" style="border:none;flex-direction:row;align-items:center;justify-content:space-between;padding:14px" data-act="bonus" data-r="${l}" data-p="${p}"><span class="bold small" style="text-align:left">${l}</span><span class="tag primary" style="background:var(--primary);color:#fff">+${p}</span></button>`).join('')}</div>
       <div class="row"><input class="input grow" id="bonus-reason" placeholder="Other reason…" aria-label="Bonus reason"><input class="input" id="bonus-pts" type="number" inputmode="numeric" value="5" min="1" max="50" style="width:76px" aria-label="Points"><button class="btn sm primary" data-act="bonusCustom">Give</button></div>
     </section>
-    ${claimed.length ? `<section class="card tint" style="box-shadow:none"><span class="h3">Prize requests</span><span class="small muted">${esc(kid())} spent his points on these. Say yes, and it waits in his "My prizes" until he uses it. Say no, and his points come back.</span>
+    ${!isToday ? '' : `${claimed.length ? `<section class="card tint" style="box-shadow:none"><span class="h3">Prize requests</span><span class="small muted">${esc(kid())} spent his points on these. Say yes, and it waits in his "My prizes" until he uses it. Say no, and his points come back.</span>
       ${claimed.map(r => `<div class="col" style="gap:6px"><span class="small bold">${esc(fillP(r.name))} · ${r.price} pts</span>
         <div class="grid2"><button class="btn sm teal" data-act="acceptPrize" data-r="${r.id}">Yes, accept</button><button class="btn sm ghost" data-act="declinePrize" data-r="${r.id}">Not now (refund)</button></div></div>`).join('')}</section>` : ''}
     ${readyPrizes.length ? `<section class="card"><span class="h3">Prizes ready to use</span><span class="small muted">Tap "Used" when he has had it. It then disappears from his list.</span>
@@ -120,7 +131,7 @@ function todayTab() {
     <section class="card"><div class="row between"><span class="h3">Heart check-ins</span><span class="small muted bold">${sentToday} of ${plan} today</span></div>
       <span class="small muted">${kidReplies ? `${esc(kid())} sent ${kidReplies} heart${kidReplies === 1 ? '' : 's'} back today.` : `Send a heart at the planned times (e.g. break). ${esc(kid())} can reply.`}</span>
       <button class="btn ghost" data-act="sendHeart" ${sentToday >= plan ? 'disabled' : ''}>${ic.heart(18)} ${sentToday >= plan ? "Today's hearts are sent" : 'Send a heart'}</button></section>
-    <section class="card soft"><span class="eyebrow" style="color:var(--primary)">Say it today</span><span class="display" style="font-size:18px;font-weight:700;line-height:1.35">"${esc(state.family.supportive_phrase)}"</span><span class="small muted">Accept the feeling, and show you trust him to cope.</span></section>`;
+    <section class="card soft"><span class="eyebrow" style="color:var(--primary)">Say it today</span><span class="display" style="font-size:18px;font-weight:700;line-height:1.35">"${esc(state.family.supportive_phrase)}"</span><span class="small muted">Accept the feeling, and show you trust him to cope.</span></section>`}`;
 }
 
 // ───────── Plan ─────────
@@ -426,28 +437,29 @@ export const parentActions = {
   parPath: el => { ui().path = el.dataset.v; render(); },
   parRange: el => { ui().range = el.dataset.v; render(); },
   async setResult(el) { await run(sb.from('brave_attempts').update({ result: el.dataset.v }).eq('id', el.dataset.att), el.dataset.v === 'not' ? 'Saved. Fresh start tomorrow.' : 'Points sent to ' + kid()); await reload(); },
-  async recordStep(el) { await run(sb.from('brave_attempts').insert({ family_id: fam(), step_id: el.dataset.step, attempt_date: today(), result: el.dataset.v }), 'Saved'); await reload(); },
-  async setSchool(el) { await run(sb.from('attendance').upsert({ family_id: fam(), day: today(), status: el.dataset.v }), 'Saved'); await reload(); },
+  async recordStep(el) { await run(sb.from('brave_attempts').insert({ family_id: fam(), step_id: el.dataset.step, attempt_date: selDay(), result: el.dataset.v }), 'Saved'); await reload(); },
+  pickDay: el => { ui().day = el.dataset.v; render(); window.scrollTo(0, 0); },
+  async setSchool(el) { await run(sb.from('attendance').upsert({ family_id: fam(), day: selDay(), status: el.dataset.v }), 'Saved'); await reload(); },
   async cycleSlot(el) {
     const m = state.d.missions.find(x => x.id === el.dataset.m); const slot = +el.dataset.slot;
-    const l = logsFor(m).find(x => x.slot === slot);
-    if (!l) await run(sb.from('mission_logs').insert({ family_id: fam(), mission_id: m.id, log_date: today(), slot, status: 'approved' }));
+    const l = logsFor(m, selDay()).find(x => x.slot === slot);
+    if (!l) await run(sb.from('mission_logs').insert({ family_id: fam(), mission_id: m.id, log_date: selDay(), slot, status: 'approved' }));
     else if (l.status === 'approved') await run(sb.from('mission_logs').update({ status: 'missed' }).eq('id', l.id));
     else await run(sb.from('mission_logs').delete().eq('id', l.id));
     await reload();
   },
-  async routineMark(el) { await run(sb.from('mission_logs').insert({ family_id: fam(), mission_id: el.dataset.m, log_date: today(), slot: 1, status: 'approved' })); await reload(); },
+  async routineMark(el) { await run(sb.from('mission_logs').insert({ family_id: fam(), mission_id: el.dataset.m, log_date: selDay(), slot: 1, status: 'approved' })); await reload(); },
   async approveLog(el) { await run(sb.from('mission_logs').update({ status: 'approved' }).eq('id', el.dataset.l)); await reload(); },
   async approveAll() {
-    const ids = state.d.logs.filter(l => l.status === 'pending' && l.log_date === today()).map(l => l.id);
+    const ids = state.d.logs.filter(l => l.status === 'pending' && l.log_date === selDay()).map(l => l.id);
     if (ids.length) await run(sb.from('mission_logs').update({ status: 'approved' }).in('id', ids), 'All approved');
     await reload();
   },
-  async bonus(el) { await run(sb.from('point_events').insert({ family_id: fam(), points: +el.dataset.p, reason: el.dataset.r, category: 'bonus' }), `+${el.dataset.p} sent to ${kid()}`); await reload(); },
+  async bonus(el) { await run(sb.from('point_events').insert({ family_id: fam(), points: +el.dataset.p, reason: el.dataset.r, category: 'bonus', ...(selDay() !== today() ? { created_at: noonOf(selDay()) } : {}) }), `+${el.dataset.p} sent to ${kid()}`); await reload(); },
   async bonusCustom() {
     const r = val('bonus-reason'), p = parseInt(val('bonus-pts'), 10);
     if (!r || !(p > 0 && p <= 50)) return toast('Add a reason and 1–50 points');
-    await run(sb.from('point_events').insert({ family_id: fam(), points: p, reason: r, category: 'bonus' }), `+${p} sent to ${kid()}`); await reload();
+    await run(sb.from('point_events').insert({ family_id: fam(), points: p, reason: r, category: 'bonus', ...(selDay() !== today() ? { created_at: noonOf(selDay()) } : {}) }), `+${p} sent to ${kid()}`); await reload();
   },
   async acceptPrize(el) { await run(sb.from('redemptions').update({ status: 'approved', decided_at: new Date().toISOString() }).eq('id', el.dataset.r), `Accepted. It's in ${kid()}'s My prizes.`); await reload(); },
   async declinePrize(el) { await run(sb.rpc('decline_redemption', { p_id: el.dataset.r }), `Declined. ${kid()}'s points are back.`); await reload(); },

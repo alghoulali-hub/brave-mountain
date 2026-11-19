@@ -59,21 +59,21 @@ export function childFoodView() {
 }
 
 // ───────── Parents: Today card ─────────
-export function parentFoodCard() {
+export function parentFoodCard(day) {
   const fm = foodMissions();
   if (!fm.length) return '';
-  const t = today();
+  const t = day || today();
   const plates = (state.d.meals || []).filter(m => m.day === t);
-  const pending = fm.flatMap(m => logsFor(m).filter(l => l.status === 'pending'));
+  const pending = fm.flatMap(m => logsFor(m, t).filter(l => l.status === 'pending'));
   const rows = fm.map(m => {
-    const l = logsFor(m)[0];
+    const l = logsFor(m, t)[0];
     return `<div class="row"><span class="grow small bold">${esc(m.title)}</span>
       ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}">Mark done</button>` :
         l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button>` :
         `<span class="small bold" style="color:var(--teal)">✓ +${m.points}</span>`}</div>`;
   }).join('');
   return `<section class="card"><div class="row between"><span class="h3">Healthy food</span>${pending.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>
-    ${plates.length ? `<span class="small muted">Plates today: ${plates.map(p => p.groups.map(emoji).join('')).join('  ·  ')}</span>` : `<span class="small muted">No plates logged yet today.</span>`}
+    ${plates.length ? `<span class="small muted">Plates: ${plates.map(p => p.groups.map(emoji).join('')).join('  ·  ')}</span>` : `<span class="small muted">No plates logged that day.</span>`}
     ${rows}</section>`;
 }
 

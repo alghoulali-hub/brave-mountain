@@ -256,8 +256,9 @@ function giftsTab() {
   const summits = state.d.gifts.filter(x => x.kind === 'summit' && x.status !== 'given');
   const grand = state.d.gifts.filter(x => x.kind === 'grand' && x.status !== 'given').slice(-1)[0];
   const toppedCount = paths().filter(l => !currentStep(l) && stepsOf(l).length).length;
-  const photoBox = (gift, act) => `<div class="row"><div style="width:72px;height:72px;border-radius:14px;flex-shrink:0;${gift?.photo_url ? `background:url('${esc(gift.photo_url)}') center/cover` : 'background:var(--sun-soft)'};display:flex;align-items:center;justify-content:center">${gift?.photo_url ? '' : ic.gift(26, 'var(--sun-ink)')}</div>
-    <label class="btn sm ghost" style="cursor:pointer">${gift?.photo_url ? 'Change photo' : 'Add photo'}<input type="file" accept="image/*" data-change="${act}" data-g="${gift?.id}" style="display:none"></label></div>`;
+  const photoBox = (gift, act) => `<div class="row wrap" style="gap:8px"><div style="width:72px;height:72px;border-radius:14px;flex-shrink:0;${gift?.photo_url ? `background:url('${esc(gift.photo_url)}') center/cover` : 'background:var(--sun-soft)'};display:flex;align-items:center;justify-content:center">${gift?.photo_url ? '' : ic.gift(26, 'var(--sun-ink)')}</div>
+    <label class="btn sm ghost" style="cursor:pointer">${gift?.photo_url ? 'Change photo' : 'Add photo'}<input type="file" accept="image/*" data-change="${act}" data-g="${gift?.id}" style="display:none"></label>
+    ${gift?.photo_url ? `<button class="btn sm danger" data-act="removePhoto" data-g="${gift.id}">Remove photo</button>` : ''}</div>`;
   return `${head('Rewards & gifts')}
     ${g ? `<section class="card"><div class="col tight"><span class="eyebrow" style="color:var(--sun-ink)">Treasure chest · secret</span><span class="small muted">${esc(kid())} only sees a locked chest. The photo and name show only when all 4 locks are open.</span></div>
       <div class="field"><label for="g-secret">What is it? (hidden from ${esc(kid())})</label><input class="input" id="g-secret" value="${esc(sec?.secret_title || '')}"></div>
@@ -557,6 +558,15 @@ export const parentActions = {
   },
   async saveSummit(el) { const id = el.dataset.g; await run(sb.from('gifts').update({ title: val('s-title-' + id), ladder_id: val('s-path-' + id) || null }).eq('id', id), 'Saved'); await reload(); },
   async uploadGiftPhoto(el) { const file = el.files?.[0]; if (!file) return; toast('Uploading…'); const url = await uploadMedia(file, 'gift'); await run(sb.from('gifts').update({ photo_url: url }).eq('id', el.dataset.g), 'Photo saved'); await reload(); },
+  async removePhoto(el) {
+    const g = state.d.gifts.find(x => x.id === el.dataset.g);
+    if (!g?.photo_url) return;
+    await run(sb.from('gifts').update({ photo_url: null }).eq('id', g.id), 'Photo removed');
+    // also delete the file itself (best effort)
+    const m = g.photo_url.match(/\/object\/public\/media\/(.+)$/);
+    if (m) { try { await sb.storage.from('media').remove([decodeURIComponent(m[1])]); } catch {} }
+    await reload();
+  },
   async uploadSummitPhoto(el) { return parentActions.uploadGiftPhoto(el); },
   async saveReward(el) {
     const id = el.dataset.r;

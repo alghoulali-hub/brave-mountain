@@ -5,6 +5,7 @@ import {
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
+import { pinCard, hasPin } from './lock.js';
 import { parentFoodCard, parentHealthSection, foodReportLines, foodMissions } from './food.js';
 
 const ui = () => (state.ui.par ||= { path: 'school', range: 'week' });
@@ -23,7 +24,7 @@ export function parentView() {
       `<button data-act="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-current="${tab === k ? 'page' : 'false'}">${i}${k === 'today' && pending ? `<span class="badge">${pending}</span>` : ''}${l}</button>`).join('')}</div></nav>`;
 }
 
-const head = (title, sub = '') => `<header class="col tight"><span class="tag parent">Parent</span><span class="h1">${title}</span>${sub ? `<span class="small muted bold">${sub}</span>` : ''}</header>`;
+const head = (title, sub = '') => `<header class="col tight"><span class="row between" style="width:100%"><span class="tag parent">Parent</span>${hasPin() ? `<button class="btn sm ghost" style="min-height:36px" data-act="lockNow" aria-label="Lock the parent area">${ic.lock(14)} Lock</button>` : ''}</span><span class="h1">${title}</span>${sub ? `<span class="small muted bold">${sub}</span>` : ''}</header>`;
 
 // ───────── Today ─────────
 function todayTab() {
@@ -307,6 +308,7 @@ function settingsTab() {
       ${m.kind === 'behaviour' ? `<label class="small bold">Check-ins <input class="input" id="mc-${m.id}" type="number" inputmode="numeric" value="${m.checkins}" min="1" max="5" style="width:70px"></label>` : ''}
       <button class="btn sm primary" data-act="saveMission" data-m="${m.id}">Save</button><button class="icon-btn" style="background:var(--soft)" data-act="delMission" data-m="${m.id}" aria-label="Delete">${ic.trash(16)}</button></div></div>`;
   return `${head('Settings')}
+    ${pinCard()}
     ${pushCard('parent')}
     <section class="card"><span class="h3">${esc(kid())}'s login</span>
       ${kidP ? `<span class="small">Username: <b>${esc(kidP.username || '')}</b></span><span class="small muted">On his phone: open the app → "I'm ${esc(kid())}" → username and password.</span>` : `

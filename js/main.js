@@ -26,17 +26,19 @@ if (!window.BRAVE_CONFIG?.url || !window.BRAVE_CONFIG?.key) {
 
 async function start() {
   const core = await import('./core.js');
-  const { state, sb, setRenderer, loadProfile, loadAll, subscribe, unsubscribe, scheduleReload, esc } = core;
+  const { state, sb, setRenderer, loadProfile, loadAll, subscribe, unsubscribe, scheduleReload, esc, toast } = core;
   const { authView, noProfileView, authActions } = await import('./auth.js');
   const { childView, childModal, childActions } = await import('./child.js');
   const { parentView, parentModal, parentActions } = await import('./parent.js');
   const { pushActions, refreshPushStatus, disablePush } = await import('./push.js');
   const { foodActions } = await import('./food.js');
+  const { lockActions, lockView, lockOnStart, watchVisibility } = await import('./lock.js');
 
   const actions = {
-    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions,
+    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions,
     tab: el => { state.tab = el.dataset.tab; state.modal = null; render(); window.scrollTo(0, 0); },
     closeModal: () => { state.modal = null; render(); },
+    async pinForgot() { state.locked = false; state.ui.lock = null; await actions.signOut(); toast('Sign in with your email and password.'); },
     async signOut() { await disablePush(true); unsubscribe(); await sb.auth.signOut(); state.session = null; state.profile = null; state.family = null; state.d = null; state.tab = null; state.ui = {}; render(); }
   };
 
@@ -61,9 +63,10 @@ async function start() {
     if (!state.session) html = authView();
     else if (!state.profile) html = noProfileView();
     else if (!state.d) html = `<div class="loading">Loading…</div>`;
+    else if (state.locked && state.profile.role === 'parent') html = lockView();
     else html = state.profile.role === 'parent' ? parentView() : childView();
 
-    if (state.modal && state.d) {
+    if (state.modal && state.d && !state.locked) {
       const m = state.profile.role === 'parent' ? parentModal(state.modal) : childModal(state.modal);
       if (m) html += `<div class="modal-back" data-backdrop="1">${m}</div>`;
     }
@@ -80,6 +83,7 @@ async function start() {
   async function perform(name, el, ev) {
     const fn = actions[name];
     if (!fn) return;
+    if (state.locked && !['pinKey', 'pinForgot'].includes(name)) return;
     if (el.tagName === 'BUTTON') el.disabled = true;
     acting = true;
     try { await fn(el, ev); } catch (e) { console.error(e); }
@@ -118,6 +122,7 @@ async function start() {
 
   render();
   await loadProfile();
+  lockOnStart(); watchVisibility();
   if (state.profile) { render(); await loadAll(); subscribe(); refreshPushStatus(); }
   render();
 

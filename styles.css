@@ -152,3 +152,15 @@ textarea.input { min-height: 96px; resize: vertical; }
 .loading { flex: 1; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--primary); min-height: 100vh; }
 @media (prefers-reduced-motion: reduce) { .breathe-ball, .puzzle .tile.waiting, .puzzle .tile.fresh, .modal, .toast { animation: none; } }
 .icon-btn:disabled { opacity: .35; cursor: default; }
+.padlock { display: inline-flex; transition: transform .3s; }
+.padlock.dim { opacity: .35; }
+.padlock.glowing { animation: lockGlow 1.2s ease-in-out infinite; }
+.padlock.just-opened .shackle { animation: shackleUp .7s ease-out both; }
+.padlock.just-opened { animation: lockPop .7s ease-out both; }
+@keyframes lockGlow { 0%,100% { transform: rotate(0); filter: drop-shadow(0 0 0 #FFB020); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } 50% { filter: drop-shadow(0 0 10px #FFB020); } }
+@keyframes shackleUp { 0% { transform: translateY(0); } 60% { transform: translateY(-6px); } 100% { transform: translateY(-4px); } }
+@keyframes lockPop { 0% { transform: scale(1); } 50% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.padlock.open .shackle { transform: translateY(-4px); }
+.chest-wiggle { animation: lockGlow 0.8s ease-in-out 2; }
+.chest-open { animation: lockPop .8s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .padlock.glowing, .padlock.just-opened, .padlock.just-opened .shackle, .chest-wiggle, .chest-open { animation: none; } }

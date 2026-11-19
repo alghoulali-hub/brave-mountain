@@ -55,23 +55,51 @@ function heartCard() {
   </div>`;
 }
 
+const LOCKS = 4;
+const perLock = g => Math.max(1, Math.round(g.pieces_total / LOCKS));
+const locksOf = (g, pieces = g.pieces_unlocked) => Math.min(LOCKS, Math.floor(pieces / perLock(g)));
+
+function padlock(open, extra = '') {
+  return `<span class="padlock ${open ? 'open' : ''} ${extra}" aria-hidden="true"><svg width="34" height="40" viewBox="0 0 34 40">
+    <path class="shackle" d="M9 17V11a8 8 0 0 1 16 0v6" fill="none" stroke="${open ? '#5ED3C3' : '#FFD27A'}" stroke-width="4" stroke-linecap="round"/>
+    <rect x="3" y="16" width="28" height="22" rx="5" fill="${open ? '#5ED3C3' : '#FFB020'}"/>
+    <circle cx="17" cy="25" r="3" fill="#1B2559"/><rect x="15.5" y="26" width="3" height="6" rx="1.5" fill="#1B2559"/></svg></span>`;
+}
+
+function chestSvg(open, size = 200) {
+  const h = Math.round(size * 0.8);
+  return open ? `<svg width="${size}" height="${h}" viewBox="0 0 200 160" aria-hidden="true">
+      <g opacity=".9">${[0, 1, 2, 3, 4, 5, 6].map(i => `<path d="M100 70 L${30 + i * 23} 0" stroke="#FFD27A" stroke-width="5" stroke-linecap="round" opacity="${0.35 + (i % 2) * 0.3}"/>`).join('')}</g>
+      <path d="M22 62 Q100 20 178 62 L178 72 L22 72 Z" fill="#6B3E12"/>
+      <ellipse cx="100" cy="72" rx="78" ry="12" fill="#FFE6A3"/>
+      <rect x="20" y="72" width="160" height="78" rx="10" fill="#9A5B1E"/>
+      <rect x="20" y="72" width="160" height="12" fill="#7A4614"/>
+      <rect x="44" y="72" width="12" height="78" fill="#FFB020"/><rect x="144" y="72" width="12" height="78" fill="#FFB020"/>
+      <rect x="88" y="92" width="24" height="26" rx="5" fill="#FFB020"/></svg>`
+    : `<svg width="${size}" height="${h}" viewBox="0 0 200 160" aria-hidden="true">
+      <path d="M20 72 V52 Q20 28 52 28 H148 Q180 28 180 52 V72 Z" fill="#B7792B"/>
+      <rect x="20" y="72" width="160" height="78" rx="10" fill="#9A5B1E"/>
+      <rect x="20" y="66" width="160" height="12" fill="#7A4614"/>
+      <rect x="44" y="28" width="12" height="122" fill="#FFB020"/><rect x="144" y="28" width="12" height="122" fill="#FFB020"/>
+      <rect x="86" y="62" width="28" height="32" rx="6" fill="#FFB020"/><circle cx="100" cy="76" r="4" fill="#1B2559"/><rect x="98" y="77" width="4" height="9" rx="2" fill="#1B2559"/></svg>`;
+}
+
 function giftCard() {
   const g = mystery();
   if (!g) return '';
-  const fresh = g.pieces_unlocked > seen(g);
-  const pct = Math.round(100 * g.pieces_unlocked / g.pieces_total);
-  const cells = Array.from({ length: g.pieces_total }, (_, i) => `<span class="${i < g.pieces_unlocked ? 'on' : ''}"></span>`).join('');
+  const open = locksOf(g), fresh = locksOf(g) > locksOf(g, seen(g));
+  const won = open >= LOCKS;
   return `<section class="card navy">
-    <div class="row between top">
+    <div class="row between">
       <div class="col tight">
-        <span class="eyebrow" style="color:#C9D2FF">Mystery gift</span>
-        <span class="display" style="font-size:24px">${g.pieces_unlocked} of ${g.pieces_total} pieces</span>
-        <span class="small" style="color:#DDE3FF">${g.status === 'won' ? 'Complete! See what it is' : 'Climb a camp to unlock 3 more'}</span>
+        <span class="eyebrow" style="color:#C9D2FF">Treasure chest</span>
+        <span class="display" style="font-size:24px">${won ? 'All locks open!' : `${open} of ${LOCKS} locks open`}</span>
+        <span class="small" style="color:#DDE3FF">${won ? 'Open it to see your surprise' : 'Climb a camp to open the next lock'}</span>
       </div>
-      <div class="minipuzzle" aria-hidden="true">${cells}</div>
+      <div style="flex-shrink:0">${chestSvg(false, 74)}</div>
     </div>
-    <div class="bar"><div style="width:${pct}%"></div></div>
-    ${fresh || g.status === 'won' ? `<button class="btn sun block" data-act="openReveal">${fresh ? 'New pieces! Tap to open' : 'See my gift'}</button>` : `<button class="btn outline-light sm" data-act="openReveal">Look at my puzzle</button>`}
+    <div class="row" style="gap:10px;justify-content:center">${Array.from({ length: LOCKS }, (_, i) => padlock(i < open)).join('')}</div>
+    ${fresh || won ? `<button class="btn sun block" data-act="openReveal">${fresh ? (won ? 'The last lock is open! Open the chest' : 'A lock opened! Tap to see') : 'See my surprise'}</button>` : `<button class="btn outline-light sm" data-act="openReveal">Look at my chest</button>`}
   </section>`;
 }
 
@@ -235,7 +263,7 @@ function rewards() {
       <div class="row between"><h2 class="h2">My wish list</h2></div>
       <div class="row"><input class="input grow" id="wish-text" maxlength="120" placeholder="Something I'd love…" aria-label="New wish"><button class="btn sm primary" data-act="addWish">Add</button></div>
       ${state.d.wishes.map(w => `<div class="list-item">${ic.heartFill(18)}<span class="grow bold">${esc(w.text)}</span><button class="icon-btn" style="background:var(--soft)" data-act="delWish" data-w="${w.id}" aria-label="Remove wish">${ic.close(18)}</button></div>`).join('')}
-      <span class="small muted">${esc(P())} sees your wishes and might hide one in a mystery gift.</span>
+      <span class="small muted">${esc(P())} sees your wishes and might hide one in your treasure chest.</span>
     </section>
   </div>`;
 }
@@ -344,31 +372,35 @@ function fearModal(m) {
 function revealModal(m) {
   const g = mystery();
   if (!g) return '';
-  const from = m.from ?? seen(g);
+  const fromLocks = locksOf(g, m.from ?? seen(g));
+  const nowLocks = locksOf(g);
+  const fresh = nowLocks - fromLocks;
   const opened = m.opened;
-  const total = g.pieces_total;
-  const won = g.pieces_unlocked >= total;
+  const won = nowLocks >= LOCKS;
+  const showGift = won && (opened || fresh <= 0);
   const sec = secretFor(g);
-  const tiles = Array.from({ length: total }, (_, i) => {
-    if (i < from) return `<div class="tile open"></div>`;
-    if (i < g.pieces_unlocked) return opened ? `<div class="tile open fresh"></div>` : `<div class="tile waiting">?</div>`;
-    return `<div class="tile locked">${ic.lock(18, '#8C98D9')}</div>`;
+  const locks = Array.from({ length: LOCKS }, (_, i) => {
+    if (i < fromLocks) return padlock(true);
+    if (i < nowLocks) return opened ? padlock(true, 'just-opened') : padlock(false, 'glowing');
+    return padlock(false, 'dim');
   }).join('');
-  const fresh = g.pieces_unlocked - from;
-  const confetti = ['#FFB020', '#7C8CFF', '#5ED3C3', '#F28DB2', '#FFB020', '#7C8CFF'].map((c, i) =>
-    `<span class="confetti" aria-hidden="true" style="background:${c};width:${8 + (i % 3) * 3}px;height:${6 + (i % 2) * 6}px;left:${[8, 88, 78, 14, 92, 4][i]}%;top:${[4, 3, 14, 18, 26, 32][i]}%;transform:rotate(${i * 37}deg)"></span>`).join('');
-  return `<div class="modal night" role="dialog" aria-modal="true" aria-label="Mystery gift" style="position:relative;align-items:center;text-align:center">
+  const confetti = showGift ? ['#FFB020', '#7C8CFF', '#5ED3C3', '#F28DB2', '#FFB020', '#7C8CFF', '#5ED3C3', '#F28DB2'].map((c, i) =>
+    `<span class="confetti" aria-hidden="true" style="background:${c};width:${8 + (i % 3) * 3}px;height:${6 + (i % 2) * 6}px;left:${[8, 88, 78, 14, 92, 4, 50, 66][i]}%;top:${[4, 3, 14, 18, 26, 32, 6, 22][i]}%;transform:rotate(${i * 37}deg)"></span>`).join('') : '';
+  const title = showGift ? `You did it, ${esc(kid())}!` : fresh > 0 ? (opened ? 'Click! A lock opened!' : 'You climbed higher!') : 'Your treasure chest';
+  return `<div class="modal night" role="dialog" aria-modal="true" aria-label="Treasure chest" style="position:relative;align-items:center;text-align:center">
     ${confetti}
     <div class="row" style="width:100%;justify-content:flex-end"><button class="icon-btn" style="background:rgba(255,255,255,.12);color:#fff" data-act="closeReveal" aria-label="Close">${ic.close()}</button></div>
-    ${fresh > 0 ? `<span class="tag mint">${fresh} new piece${fresh === 1 ? '' : 's'}!</span>` : ''}
-    <span class="h1" style="font-size:32px">${won && opened ? `You did it, ${esc(kid())}!` : fresh > 0 ? 'You climbed higher!' : 'Your mystery gift'}</span>
-    <div class="puzzle" role="img" aria-label="${g.pieces_unlocked} of ${total} pieces revealed">
-      ${g.photo_url ? `<div class="photo" style="background-image:url('${esc(g.photo_url)}')"></div>` : `<div class="placeholder"><span class="display" style="font-size:20px">Mystery gift</span><span class="small">${esc(P())} adds a photo secretly</span></div>`}
-      <div class="tiles">${tiles}</div>
-    </div>
-    ${won && (opened || fresh <= 0) && sec ? `<span class="display" style="font-size:24px;color:var(--sun)">It's: ${esc(sec.secret_title)}!</span><span class="small" style="color:#DDE3FF">Show ${esc(P())} to get it.</span>` :
-      `<span class="bold" style="color:#DDE3FF">${g.pieces_unlocked} of ${total} pieces${won ? '' : ` · ${total - g.pieces_unlocked} more to go`}</span>`}
-    ${fresh > 0 && !opened ? `<button class="btn sun block" data-act="revealPieces">Tap to reveal ${fresh} piece${fresh === 1 ? '' : 's'}</button>` : `<button class="btn outline-light block" data-act="closeReveal">Back to my mountain</button>`}
+    ${fresh > 0 && !showGift ? `<span class="tag mint">${fresh} new lock${fresh === 1 ? '' : 's'}!</span>` : ''}
+    <span class="h1" style="font-size:30px">${title}</span>
+    <div class="${showGift ? 'chest-open' : opened && fresh > 0 ? 'chest-wiggle' : ''}">${chestSvg(showGift, 210)}</div>
+    ${showGift ? `
+      ${g.photo_url ? `<div style="width:100%;aspect-ratio:4/3;border-radius:18px;background:url('${esc(g.photo_url)}') center/cover;box-shadow:0 0 0 4px #FFB020" role="img" aria-label="${esc(sec?.secret_title || 'Your surprise')}"></div>` : ''}
+      <span class="display" style="font-size:26px;color:var(--sun)">${sec ? `It's: ${esc(sec.secret_title)}!` : 'Your surprise is ready!'}</span>
+      <span class="small" style="color:#DDE3FF">Show ${esc(P())} to get it.</span>`
+    : `<div class="row" style="gap:12px;justify-content:center" role="img" aria-label="${nowLocks} of ${LOCKS} locks open">${locks}</div>
+      <span class="bold" style="color:#DDE3FF">${nowLocks} of ${LOCKS} locks open${won ? '' : ` · ${LOCKS - nowLocks} to go`}</span>
+      <span class="small" style="color:#C9D2FF">What's inside is a secret until the last lock opens.</span>`}
+    ${fresh > 0 && !opened ? `<button class="btn sun block" data-act="revealPieces">${won ? 'Open the last lock!' : `Open the new lock${fresh === 1 ? '' : 's'}`}</button>` : `<button class="btn outline-light block" data-act="closeReveal">Back to my mountain</button>`}
   </div>`;
 }
 

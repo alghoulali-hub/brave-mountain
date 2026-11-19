@@ -259,15 +259,15 @@ function giftsTab() {
   const photoBox = (gift, act) => `<div class="row"><div style="width:72px;height:72px;border-radius:14px;flex-shrink:0;${gift?.photo_url ? `background:url('${esc(gift.photo_url)}') center/cover` : 'background:var(--sun-soft)'};display:flex;align-items:center;justify-content:center">${gift?.photo_url ? '' : ic.gift(26, 'var(--sun-ink)')}</div>
     <label class="btn sm ghost" style="cursor:pointer">${gift?.photo_url ? 'Change photo' : 'Add photo'}<input type="file" accept="image/*" data-change="${act}" data-g="${gift?.id}" style="display:none"></label></div>`;
   return `${head('Rewards & gifts')}
-    ${g ? `<section class="card"><div class="col tight"><span class="eyebrow" style="color:var(--sun-ink)">Mystery gift · secret</span><span class="small muted">${esc(kid())} only sees the puzzle. The name is revealed when all pieces are open.</span></div>
+    ${g ? `<section class="card"><div class="col tight"><span class="eyebrow" style="color:var(--sun-ink)">Treasure chest · secret</span><span class="small muted">${esc(kid())} only sees a locked chest. The photo and name show only when all 4 locks are open.</span></div>
       <div class="field"><label for="g-secret">What is it? (hidden from ${esc(kid())})</label><input class="input" id="g-secret" value="${esc(sec?.secret_title || '')}"></div>
       ${photoBox(g, 'uploadGiftPhoto')}
-      <div class="row between"><span class="bold">Pieces open: ${g.pieces_unlocked} / ${g.pieces_total}</span>
-        <div class="row" style="gap:6px"><button class="icon-btn" style="background:var(--soft)" data-act="pieces" data-n="-1" aria-label="One piece less">–</button><button class="icon-btn" style="background:var(--soft)" data-act="pieces" data-n="1" aria-label="One piece more">${ic.plus(18)}</button></div></div>
-      <span class="small muted">Each camp climbed opens 3 pieces automatically.</span>
+      <div class="row between"><span class="bold">Locks open: ${Math.min(4, Math.floor(g.pieces_unlocked / Math.max(1, Math.round(g.pieces_total / 4))))} / 4</span>
+        <div class="row" style="gap:6px"><button class="icon-btn" style="background:var(--soft)" data-act="pieces" data-n="-${Math.max(1, Math.round(g.pieces_total / 4))}" aria-label="Close one lock">–</button><button class="icon-btn" style="background:var(--soft)" data-act="pieces" data-n="${Math.max(1, Math.round(g.pieces_total / 4))}" aria-label="Open one lock">${ic.plus(18)}</button></div></div>
+      <span class="small muted">Each camp climbed opens one lock automatically. Use + for a big brave day.</span>
       <button class="btn sm primary" data-act="saveSecret">Save</button>
-      ${g.status === 'won' ? `<button class="btn teal" data-act="newGift">Mark as given and start a new mystery gift</button>` : ''}
-    </section>` : `<button class="btn primary" data-act="newGift">Start a mystery gift</button>`}
+      ${g.status === 'won' ? `<button class="btn teal" data-act="newGift">Mark as given and start a new treasure chest</button>` : ''}
+    </section>` : `<button class="btn primary" data-act="newGift">Start a treasure chest</button>`}
     ${summits.map(s => { const pl = state.d.ladders.find(x => x.id === s.ladder_id); return `<section class="card"><div class="col tight"><span class="eyebrow" style="color:var(--sun-ink)">Summit prize · ${esc(pl?.title || 'no path')}</span><span class="small muted">Chosen together with ${esc(kid())}. Won at the top of its path.</span></div>
       <div class="field"><label for="s-title-${s.id}">Prize</label><input class="input" id="s-title-${s.id}" value="${esc(s.title || '')}"></div>
       <div class="field"><label for="s-path-${s.id}">Path</label><select class="input" id="s-path-${s.id}">${paths().map(x => `<option value="${x.id}" ${x.id === s.ladder_id ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></div>
@@ -347,7 +347,7 @@ export function parentModal(m) {
   if (m.kind === 'climb') {
     const l = ladder(ui().path) || paths()[0]; const cur = currentStep(l); const next = stepsOf(l).find(s => s.position === cur.position + 1);
     return `<div class="modal" role="dialog" aria-modal="true" aria-label="Move up a camp"><span class="h2">Move ${esc(kid())} up a camp?</span>
-      <p class="muted" style="margin:0">Camp ${cur.position} (${esc(fillP(cur.title))}) is climbed. ${next ? `Next: Camp ${next.position} · ${esc(fillP(next.title))}.` : 'This is the top!'}<br><br>${esc(kid())} gets +100 points and 3 new puzzle pieces. Check with him first, so the next step isn't a surprise.</p>
+      <p class="muted" style="margin:0">Camp ${cur.position} (${esc(fillP(cur.title))}) is climbed. ${next ? `Next: Camp ${next.position} · ${esc(fillP(next.title))}.` : 'This is the top!'}<br><br>${esc(kid())} gets +100 points and one lock opens on his treasure chest. Check with him first, so the next step isn't a surprise.</p>
       <div class="grid2"><button class="btn ghost" data-act="closeModal">Not yet</button><button class="btn primary" data-act="doClimb">Move up</button></div></div>`;
   }
   if (m.kind === 'paths') {
@@ -447,7 +447,7 @@ export const parentActions = {
   async markUsed(el) { await run(sb.from('redemptions').update({ status: 'used' }).eq('id', el.dataset.r), 'Marked as used'); await reload(); },
   async sendHeart() { await run(sb.from('hearts').insert({ family_id: fam(), from_role: 'parent' }), `Heart sent to ${kid()}`); await reload(); },
   askClimb: () => openModal('climb'),
-  async doClimb() { const l = ladder(ui().path) || paths()[0]; await run(sb.rpc('climb_camp', { p_ladder: l.id })); closeModal(); toast(`${kid()} moved up! +100 and 3 puzzle pieces`); await reload(); },
+  async doClimb() { const l = ladder(ui().path) || paths()[0]; await run(sb.rpc('climb_camp', { p_ladder: l.id })); closeModal(); toast(`${kid()} moved up! +100 and a lock opened`); await reload(); },
   editSteps: () => openModal('steps'),
   managePaths: () => openModal('paths'),
   async movePath(el) {
@@ -553,7 +553,7 @@ export const parentActions = {
     const { data, error } = await sb.from('gifts').insert({ family_id: fam(), kind: 'mystery', pieces_total: 12 }).select().single();
     if (error) return toast(friendly(error.message));
     await run(sb.from('gift_secrets').insert({ gift_id: data.id, family_id: fam(), secret_title: 'New mystery gift' }));
-    toast('New mystery gift started. Add its name and photo.'); await reload();
+    toast('New treasure chest started. Add its name and photo.'); await reload();
   },
   async saveSummit(el) { const id = el.dataset.g; await run(sb.from('gifts').update({ title: val('s-title-' + id), ladder_id: val('s-path-' + id) || null }).eq('id', id), 'Saved'); await reload(); },
   async uploadGiftPhoto(el) { const file = el.files?.[0]; if (!file) return; toast('Uploading…'); const url = await uploadMedia(file, 'gift'); await run(sb.from('gifts').update({ photo_url: url }).eq('id', el.dataset.g), 'Photo saved'); await reload(); },

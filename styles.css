@@ -164,3 +164,8 @@ textarea.input { min-height: 96px; resize: vertical; }
 .chest-wiggle { animation: lockGlow 0.8s ease-in-out 2; }
 .chest-open { animation: lockPop .8s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .padlock.glowing, .padlock.just-opened, .padlock.just-opened .shackle, .chest-wiggle, .chest-open { animation: none; } }
+.night-list .list-item { background: rgba(255,255,255,.08); color: #fff; }
+.night-list .list-item .muted { color: #C9D2FF; }
+.night-list .check { background: transparent; border-color: rgba(255,255,255,.35); }
+.night-list .check.ok { background: var(--sun); border-color: var(--sun); }
+.night-list .check.pending { background: rgba(255,176,32,.25); border-color: var(--sun); }

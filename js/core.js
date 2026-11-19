@@ -4,7 +4,7 @@ export const sb = window.supabase.createClient(cfg.url, cfg.key, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'brave-auth' }
 });
 export const KID_DOMAIN = 'kids.brave-family.app';
-export const APP_VERSION = '2.2 · 19 Nov';
+export const APP_VERSION = '2.3 · 19 Nov';
 
 export const state = {
   session: null,
@@ -164,7 +164,9 @@ export function eventsOn(dateStr) { return state.d.events.filter(e => localDay(e
 export function earnedOn(dateStr) { return sum(eventsOn(dateStr).filter(e => e.points > 0), e => e.points); }
 export function attendanceOn(dateStr) { return state.d.attendance.find(a => a.day === dateStr) || null; }
 export function logsFor(mission, dateStr = today()) { return state.d.logs.filter(l => l.mission_id === mission.id && l.log_date === dateStr); }
-export function routineMissions() { return state.d.missions.filter(m => m.kind === 'routine' && m.active); }
+export function routineMissions(part) { return state.d.missions.filter(m => m.kind === 'routine' && m.active && (!part || (m.part || 'morning') === part)); }
+export const PARTS = [['morning', 'Morning routine'], ['evening', 'Evening routine'], ['bedtime', 'Bedtime routine']];
+export function currentPart() { const h = new Date().getHours(); return h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 19 ? 'evening' : 'bedtime'; }
 export function behaviourMissions() { return state.d.missions.filter(m => m.kind === 'behaviour' && m.active); }
 export function childProfile() { return state.d.profiles.find(p => p.role === 'child') || null; }
 export function heartsToday() { const t = today(); return state.d.hearts.filter(h => localDay(h.created_at) === t); }

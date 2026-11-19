@@ -1,7 +1,7 @@
 import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, localDay, sum, render, toast, openModal, closeModal, run, friendly,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, readiness, mystery, summit, secretFor, eventsOn, earnedOn,
-  attendanceOn, logsFor, routineMissions, behaviourMissions, childProfile, heartsToday, loadAll, KID_DOMAIN, uid
+  attendanceOn, logsFor, routineMissions, PARTS, currentPart, behaviourMissions, childProfile, heartsToday, loadAll, KID_DOMAIN, uid
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -73,13 +73,18 @@ function todayTab() {
 
   const routine = routineMissions();
   const pendingLogs = routine.flatMap(m => logsFor(m).filter(l => l.status === 'pending'));
-  const routineRows = routine.map(m => {
+  const routineRow = m => {
     const l = logsFor(m)[0];
     return `<div class="row"><span class="grow small bold">${esc(m.title)}</span>
       ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}">Mark done</button>` :
         l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button>` :
         `<span class="small bold" style="color:var(--teal)">✓ +${m.points}</span>`}</div>`;
-  }).join('');
+  };
+  const routineRows = PARTS.map(([part, label]) => {
+    const list = routineMissions(part); if (!list.length) return '';
+    const done = list.filter(m => logsFor(m)[0]).length;
+    return `<div class="row between" style="margin-top:4px"><span class="small bold" style="color:var(--primary)">${label}${part === currentPart() ? ' · now' : ''}</span><span class="tiny muted bold">${done}/${list.length}</span></div>${list.map(routineRow).join('')}`;
+  }).join('<div class="divider"></div>');
 
   const claimed = state.d.redemptions.filter(r => r.status === 'claimed');
   const readyPrizes = state.d.redemptions.filter(r => r.status === 'approved');
@@ -101,7 +106,7 @@ function todayTab() {
     </section>
     ${behaviour ? `<section class="card">${behaviour}</section>` : ''}
     ${parentFoodCard()}
-    <section class="card"><div class="row between"><span class="h3">Morning routine</span>${pendingLogs.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>${routineRows || '<span class="small muted">No routine steps</span>'}</section>
+    <section class="card"><div class="row between"><span class="h3">Routines</span>${pendingLogs.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>${routineRows || '<span class="small muted">No routine steps</span>'}</section>
     <section class="col"><span class="h3">Quick bonus</span>
       <div class="grid2">${[['Brave moment', 10], ['Calmed down', 5], ['Kind act', 5], ['Tried something hard', 5]].map(([l, p]) =>
         `<button class="card" style="border:none;flex-direction:row;align-items:center;justify-content:space-between;padding:14px" data-act="bonus" data-r="${l}" data-p="${p}"><span class="bold small" style="text-align:left">${l}</span><span class="tag primary" style="background:var(--primary);color:#fff">+${p}</span></button>`).join('')}</div>
@@ -329,8 +334,8 @@ function settingsTab() {
       <div class="field"><label for="f-safety">Safety plan (shown in the Calm Corner)</label><textarea class="input" id="f-safety" style="min-height:160px">${esc(f.safety_plan || '')}</textarea><span class="tiny muted">{P} becomes "${esc(P())}". Replace the [name] with a real trusted adult.</span></div>
       <button class="btn primary" data-act="saveFamily">Save</button>
     </section>
-    <section class="card"><span class="h3">Morning routine steps</span>${routineMissions().map(missionRow).join('')}
-      <button class="btn sm ghost" data-act="addMission" data-k="routine">${ic.plus(16)} Add routine step</button></section>
+    ${PARTS.map(([part, label]) => `<section class="card"><span class="h3">${label}</span>${routineMissions(part).map(missionRow).join('')}
+      <button class="btn sm ghost" data-act="addMission" data-k="routine" data-part="${part}">${ic.plus(16)} Add step</button></section>`).join('')}
     <section class="card"><span class="h3">Food missions</span><span class="small muted">Healthy habits that earn points. No weight goals here.</span>${foodMissions().map(missionRow).join('')}
       <button class="btn sm ghost" data-act="addMission" data-k="food">${ic.plus(16)} Add food mission</button></section>
     <section class="card"><span class="h3">Behaviour rules</span><span class="small muted">Start with one simple rule.</span>${behaviourMissions().map(missionRow).join('')}
@@ -397,6 +402,7 @@ export function parentModal(m) {
 
 const TEMPLATES = {
   health: { label: 'Health habits', title: 'Health path', steps: ['Drink water with every meal', 'A fruit or vegetable every day', 'Try one new food this week', 'Help cook a healthy dinner', 'Active play for 30 minutes a day'] },
+  sleep: { label: 'Sleeping alone', title: 'Sleep path', steps: ['{P} sits on the bed until I fall asleep', '{P} sits on a chair next to the bed', '{P} sits on a chair by the door', '{P} stays in the doorway', '{P} checks on me every 5 minutes', '{P} checks on me every 15 minutes', '{P} says goodnight and leaves, I fall asleep on my own', 'I sleep in my own bed all night'] },
   blank: { label: 'Blank', title: '', steps: ['', '', ''] }
 };
 
@@ -627,7 +633,7 @@ export const parentActions = {
   async delMission(el) { await run(sb.from('missions').update({ active: false }).eq('id', el.dataset.m), 'Removed'); await reload(); },
   async addMission(el) {
     const k = el.dataset.k;
-    await run(sb.from('missions').insert({ family_id: fam(), kind: k, title: k === 'routine' ? 'New step' : k === 'food' ? 'New food mission' : 'New rule', points: k === 'behaviour' ? 5 : 3, checkins: k === 'behaviour' ? 3 : 1, sort: state.d.missions.length + 1 }));
+    await run(sb.from('missions').insert({ family_id: fam(), kind: k, part: el.dataset.part || 'morning', title: k === 'routine' ? 'New step' : k === 'food' ? 'New food mission' : 'New rule', points: k === 'behaviour' ? 5 : 3, checkins: k === 'behaviour' ? 3 : 1, sort: state.d.missions.length + 1 }));
     await reload();
   },
   async makeInvite() { const { data, error } = await sb.rpc('make_invite'); if (error) return toast(friendly(error.message)); state.ui.invite = data; render(); },

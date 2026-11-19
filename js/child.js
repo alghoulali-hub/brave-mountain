@@ -1,7 +1,7 @@
 import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, greeting, sum, render, toast, openModal, closeModal, run,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, mystery, summit, secretFor, eventsOn, earnedOn,
-  attendanceOn, logsFor, routineMissions, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
+  attendanceOn, logsFor, routineMissions, PARTS, currentPart, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -155,17 +155,31 @@ function mountainCard() {
   </section>`;
 }
 
-function missionsCard() {
-  const t = today();
-  const att = attendanceOn(t);
-  const routine = routineMissions();
-  const items = routine.map(m => {
+function routineItems(part) {
+  return routineMissions(part).map(m => {
     const log = logsFor(m)[0];
     const cls = !log ? '' : log.status === 'approved' ? 'ok' : log.status === 'pending' ? 'pending' : '';
     return `<button class="list-item" style="border:none;width:100%;text-align:left" data-act="toggleRoutine" data-m="${m.id}" aria-pressed="${!!log}">
       <span class="check ${cls}">${log ? ic.check(20, log.status === 'approved' ? 'var(--ink)' : 'var(--sun-ink)') : ''}</span>
       <span class="grow col tight"><span class="bold">${esc(m.title)}</span><span class="small muted">${!log ? `+${m.points}` : log.status === 'approved' ? `Approved · +${m.points}` : `Waiting for ${esc(P())}`}</span></span>
     </button>`;
+  }).join('');
+}
+
+function missionsCard() {
+  const t = today();
+  const att = attendanceOn(t);
+  const open = ui().openPart || currentPart();
+  const sections = PARTS.map(([part, label]) => {
+    const list = routineMissions(part);
+    if (!list.length) return '';
+    const done = list.filter(m => logsFor(m)[0]).length;
+    const isOpen = part === open, now = part === currentPart();
+    return `<button class="list-item" style="border:none;width:100%;text-align:left;background:${isOpen ? 'var(--primary-tint)' : '#fff'}" data-act="kidPart" data-v="${part}" aria-expanded="${isOpen}">
+        <span class="ico" style="background:${part === 'bedtime' ? 'var(--primary-soft)' : 'var(--sun-soft)'}">${part === 'bedtime' ? ic.moon(20, 'var(--primary)') : ic.sun(20, 'var(--sun-ink)')}</span>
+        <span class="grow col tight"><span class="bold">${label}${now ? ' <span class="tag primary" style="margin-left:4px;padding:2px 8px">Now</span>' : ''}</span><span class="small muted bold">${done} of ${list.length} done</span></span>
+        <span class="small bold" style="color:var(--primary)">${isOpen ? 'Hide' : 'Show'}</span></button>
+      ${isOpen ? routineItems(part) : ''}`;
   }).join('');
   const beh = behaviourMissions().map(m => {
     const logs = logsFor(m);
@@ -177,8 +191,7 @@ function missionsCard() {
     <span class="grow col tight"><span class="bold">Made it to school</span><span class="small muted">${att ? (att.status === 'went' ? 'Yes! +20' : att.status === 'partly' ? 'Part of the day +10' : 'Fresh start tomorrow') : `${esc(P())} confirms · +20`}</span></span></div>`;
   return `<section class="col" style="gap:10px">
     <h2 class="h2">Today's missions</h2>
-    <span class="small muted bold">Morning routine</span>
-    ${items || '<div class="empty">No routine steps yet</div>'}
+    ${sections || '<div class="empty">No routine steps yet</div>'}
     ${school}${beh}
   </section>`;
 }
@@ -280,6 +293,8 @@ function tonight() {
   const streak = schoolStreak();
   return `<div class="screen night">
     <header class="row between top"><div class="col tight"><span class="small bold" style="color:#C9D2FF">${new Date().toLocaleDateString('en-GB', { weekday: 'long' })}</span><span class="h1">Today's wins, ${esc(kid())}</span></div>${ic.moon(34, '#FFD27A')}</header>
+    ${routineMissions('bedtime').length ? `<section class="col" style="gap:8px"><span class="bold">Bedtime routine · ${routineMissions('bedtime').filter(m => logsFor(m)[0]).length} of ${routineMissions('bedtime').length}</span>
+      <div class="col night-list" style="gap:8px">${routineItems('bedtime')}</div></section>` : ''}
     <section class="card glass" style="gap:8px">
       <div class="row between"><span class="small bold" style="color:#C9D2FF">Points today</span><span class="display" style="font-size:30px;color:var(--sun)">+${total}</span></div>
       ${ev.length ? ev.map(e => `<div class="row between small"><span class="${e.category === 'improve' ? 'bold' : ''}" style="${e.category === 'improve' ? 'color:var(--mint)' : ''}">${esc(fillP(e.reason))}</span><span class="bold">+${e.points}</span></div>`).join('') : '<span class="small" style="color:#DDE3FF">No points yet today. Every day is a new chance.</span>'}
@@ -416,6 +431,7 @@ async function logCalm(tool) {
 
 let breatheTimer = null;
 export const childActions = {
+  kidPart: el => { const u = ui(); const cur = u.openPart || currentPart(); u.openPart = cur === el.dataset.v ? 'none' : el.dataset.v; render(); },
   kidPath: el => { ui().path = el.dataset.v; render(); },
   kidTier: el => { ui().tier = el.dataset.v; render(); },
   feel: el => { ui().feeling = el.dataset.v; render(); },

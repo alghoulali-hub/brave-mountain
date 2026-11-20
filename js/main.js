@@ -33,9 +33,10 @@ async function start() {
   const { pushActions, refreshPushStatus, disablePush } = await import('./push.js');
   const { foodActions } = await import('./food.js');
   const { lockActions, lockView, lockOnStart, watchVisibility } = await import('./lock.js');
+  const { feedActions } = await import('./feed.js');
 
   const actions = {
-    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions,
+    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions, ...feedActions,
     tab: el => { state.tab = el.dataset.tab; state.modal = null; render(); window.scrollTo(0, 0); },
     closeModal: () => { state.modal = null; render(); },
     async pinForgot() { state.locked = false; state.ui.lock = null; await actions.signOut(); toast('Sign in with your email and password.'); },

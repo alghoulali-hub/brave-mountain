@@ -6,6 +6,7 @@ import {
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
 import { pinCard, hasPin } from './lock.js';
+import { bellButton, feedModal } from './feed.js';
 import { parentFoodCard, parentHealthSection, foodReportLines, foodMissions } from './food.js';
 
 const ui = () => (state.ui.par ||= { path: 'school', range: 'week' });
@@ -29,7 +30,7 @@ export function parentView() {
       `<button data-act="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-current="${tab === k ? 'page' : 'false'}">${i}${k === 'today' && pending ? `<span class="badge">${pending}</span>` : ''}${l}</button>`).join('')}</div></nav>`;
 }
 
-const head = (title, sub = '') => `<header class="col tight"><span class="row between" style="width:100%"><span class="tag parent">Parent</span>${hasPin() ? `<button class="btn sm ghost" style="min-height:36px" data-act="lockNow" aria-label="Lock the parent area">${ic.lock(14)} Lock</button>` : ''}</span><span class="h1">${title}</span>${sub ? `<span class="small muted bold">${sub}</span>` : ''}</header>`;
+const head = (title, sub = '') => `<header class="col tight"><span class="row between" style="width:100%"><span class="tag parent">Parent</span><span class="row" style="gap:8px">${hasPin() ? `<button class="btn sm ghost" style="min-height:36px" data-act="lockNow" aria-label="Lock the parent area">${ic.lock(14)} Lock</button>` : ''}${bellButton()}</span></span><span class="h1">${title}</span>${sub ? `<span class="small muted bold">${sub}</span>` : ''}</header>`;
 
 // ───────── Today ─────────
 function todayTab() {
@@ -361,6 +362,7 @@ function settingsTab() {
 
 // ───────── Modals ─────────
 export function parentModal(m) {
+  if (m.kind === 'feed') return feedModal(m);
   if (m.kind === 'climb') {
     const l = ladder(ui().path) || paths()[0]; const cur = currentStep(l); const next = stepsOf(l).find(s => s.position === cur.position + 1);
     return `<div class="modal" role="dialog" aria-modal="true" aria-label="Move up a camp"><span class="h2">Move ${esc(kid())} up a camp?</span>

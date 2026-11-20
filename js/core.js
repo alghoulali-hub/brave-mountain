@@ -4,7 +4,7 @@ export const sb = window.supabase.createClient(cfg.url, cfg.key, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'brave-auth' }
 });
 export const KID_DOMAIN = 'kids.brave-family.app';
-export const APP_VERSION = '2.4 · 19 Nov';
+export const APP_VERSION = '2.5 · 20 Nov';
 
 export const state = {
   session: null,
@@ -101,7 +101,8 @@ export async function loadAll() {
     secrets: q('gift_secrets'),
     wishes: q('wishes', x => x.order('created_at')),
     hearts: q('hearts', x => x.gte('created_at', addDays(today(), -1) + 'T00:00:00').order('created_at')),
-    meals: q('meals', x => x.gte('day', since))
+    meals: q('meals', x => x.gte('day', since)),
+    activity: q('activity', x => x.order('created_at', { ascending: false }).limit(80))
   };
   if (parent) {
     jobs.accommodations = q('accommodations', x => x.order('sort'));
@@ -118,6 +119,7 @@ export async function loadAll() {
   d.worries = d.worries || [];
   d.weights = d.weights || [];
   d.meals = d.meals || [];
+  d.activity = d.activity || [];
   state.d = d;
 }
 
@@ -130,7 +132,7 @@ let channel = null;
 export function subscribe() {
   if (channel) sb.removeChannel(channel);
   channel = sb.channel('family-' + state.profile.family_id);
-  ['point_events', 'brave_attempts', 'attendance', 'mission_logs', 'hearts', 'gifts', 'redemptions', 'calm_uses', 'wishes', 'ladders', 'meals']
+  ['point_events', 'brave_attempts', 'attendance', 'mission_logs', 'hearts', 'gifts', 'redemptions', 'calm_uses', 'wishes', 'ladders', 'meals', 'activity']
     .forEach(t => channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, scheduleReload));
   channel.subscribe();
 }

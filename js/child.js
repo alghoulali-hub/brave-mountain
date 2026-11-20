@@ -6,6 +6,7 @@ import {
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
 import { childFoodView } from './food.js';
+import { bellButton, feedModal } from './feed.js';
 
 const ui = () => (state.ui.kid ||= { path: 'school', tier: 'daily', feeling: null });
 const seenKey = g => `brave-seen-${g.id}`;
@@ -38,7 +39,7 @@ function header() {
   return `<header class="row between">
     <div class="row"><div class="avatar">${esc(kid()[0] || 'T')}</div>
       <div class="col tight"><span class="small muted bold">${greeting()},</span><span class="display" style="font-size:26px">${esc(kid())}</span></div></div>
-    <div class="points-pill">${ic.star()}<span>${state.d.balance}</span><span class="small muted">pts</span></div>
+    <div class="row" style="gap:8px">${bellButton()}<div class="points-pill">${ic.star()}<span>${state.d.balance}</span><span class="small muted">pts</span></div></div>
   </header>`;
 }
 
@@ -317,6 +318,7 @@ function tonight() {
 
 // ───────── Modals ─────────
 export function childModal(m) {
+  if (m.kind === 'feed') return feedModal(m);
   if (m.kind === 'fear') return fearModal(m);
   if (m.kind === 'breathe') return `<div class="modal calm" role="dialog" aria-modal="true" aria-label="Balloon breathing">
     <div class="row between"><span class="h2">Balloon breathing</span><button class="icon-btn" data-act="closeModal" aria-label="Close">${ic.close()}</button></div>

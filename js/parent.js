@@ -7,6 +7,7 @@ import { ic } from './icons.js';
 import { pushCard } from './push.js';
 import { pinCard, hasPin } from './lock.js';
 import { bellButton, feedModal } from './feed.js';
+import { parentHomeworkCard, focusProgress, focusReportLine } from './focus.js';
 import { parentFoodCard, parentHealthSection, foodReportLines, foodMissions } from './food.js';
 
 const ui = () => (state.ui.par ||= { path: 'school', range: 'week' });
@@ -122,6 +123,7 @@ function todayTab() {
       <div class="divider"></div><span class="h3">Brave steps</span>${recordRows}
     </section>
     ${behaviour ? `<section class="card">${behaviour}</section>` : ''}
+    ${parentHomeworkCard(t)}
     ${parentFoodCard(t)}
     <section class="card"><div class="row between"><span class="h3">Routines</span>${pendingLogs.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>
       ${pendingLogs.length ? `<span class="tiny muted">Tap ✕ if a ticked step isn't done yet. ${esc(kid())} gets a gentle "not yet" and can tick it again later.</span>` : ''}${routineRows || '<span class="small muted">No routine steps</span>'}</section>
@@ -253,6 +255,7 @@ function progressTab() {
       <div class="row wrap tiny bold muted" style="gap:12px"><span class="row" style="gap:6px"><span style="width:12px;height:12px;border-radius:4px;background:var(--sun)"></span>At school</span><span class="row" style="gap:6px"><span style="width:12px;height:12px;border-radius:4px;background:#FFD27A"></span>Part of day</span><span class="row" style="gap:6px"><span style="width:12px;height:12px;border-radius:4px;background:var(--line)"></span>At home</span></div></section>
     <section class="card"><span class="h3">When he uses the Calm Corner</span>
       ${Object.entries(buckets).map(([k, v]) => `<div class="row"><span class="small bold" style="width:92px">${k}</span><div class="bar grow" style="height:12px"><div style="width:${Math.round(100 * v / maxB)}%;background:var(--teal)"></div></div><span class="small bold" style="width:18px">${v}</span></div>`).join('')}</section>
+    ${focusProgress(from)}
     ${parentHealthSection(from)}
     <button class="btn primary block" data-act="shareReport">${ic.share(18, '#fff')} Share report with his psychologist / ABA team</button>`;
 }
@@ -268,6 +271,7 @@ function reportText() {
   attempts.forEach(a => { const s = state.d.steps.find(x => x.id === a.step_id); lines.push(`${a.attempt_date} · Camp ${s?.position} ${fillP(s?.title)} · ${a.fear_before ?? '-'}/${a.fear_after ?? '-'} · ${a.result || 'pending'}`); });
   const calm = state.d.calm.filter(c => localDay(c.created_at) >= from);
   lines.push('', `Calm Corner used ${calm.length} times${calm.length ? ': ' + Object.entries(calm.reduce((o, c) => (o[c.tool] = (o[c.tool] || 0) + 1, o), {})).map(([k, v]) => `${k} ${v}`).join(', ') : ''}.`);
+  lines.push(...focusReportLine(from));
   lines.push(...foodReportLines(from));
   const acc = state.d.accommodations; if (acc.length) lines.push('', 'Accommodations being reduced: ' + acc.map(a => `${a.text} (${a.status})`).join('; '));
   return lines.join('\n');
@@ -354,6 +358,10 @@ function settingsTab() {
       <div class="field"><label for="f-safety">Safety plan (shown in the Calm Corner)</label><textarea class="input" id="f-safety" style="min-height:160px">${esc(f.safety_plan || '')}</textarea><span class="tiny muted">{P} becomes "${esc(P())}". Replace the [name] with a real trusted adult.</span></div>
       <button class="btn primary" data-act="saveFamily">Save</button>
     </section>
+    <section class="card"><span class="h3">Focus time</span><span class="small muted">Length of ${esc(kid())}'s focus sprints and breaks. Start short and grow slowly.</span>
+      <div class="row wrap" style="gap:10px"><label class="small bold">Sprint <input class="input" id="f-focus" type="number" inputmode="numeric" min="5" max="45" value="${f.focus_minutes || 10}" style="width:76px"> min</label>
+        <label class="small bold">Break <input class="input" id="f-break" type="number" inputmode="numeric" min="1" max="15" value="${f.break_minutes || 3}" style="width:76px"> min</label>
+        <button class="btn sm primary" data-act="saveFocus">Save</button></div></section>
     <section class="card"><span class="h3">Routine times</span><span class="small muted">${esc(kid())} can only tick a routine during its time. You can always mark steps yourself.</span>
       ${PARTS.map(([part, label]) => { const [a, b] = partTimes(part); return `<div class="row wrap" style="gap:8px"><span class="small bold" style="width:120px">${label}</span>
         <input class="input" type="time" id="rt-from-${part}" value="${a}" style="width:auto" aria-label="${label} opens"><span class="small">to</span><input class="input" type="time" id="rt-to-${part}" value="${b}" style="width:auto" aria-label="${label} closes"></div>`; }).join('')}
@@ -395,6 +403,7 @@ export function confirmText(name, el) {
       const label = { done: 'Done (+30 points)', tried: 'Tried (+10 points)', not: 'Not today (no points, nothing lost)' }[d.v];
       return { title: `Mark this brave step as ${label.split(' (')[0]}?`, body: label.includes('(') ? label.slice(label.indexOf('(') + 1, -1) : '', yes: 'Yes' };
     }
+    case 'homeworkChecked': return { title: 'Homework checked?', body: `${k} gets +5 points, and "Homework done" is ticked in his evening routine.`, yes: 'Yes, checked' };
     case 'routineMark': { const m = mis(d.m); return m && { title: `Mark "${esc(m.title)}" as done?`, body: `${k} gets +${m.points} points.`, yes: 'Yes, done' }; }
     default: return null;
   }
@@ -699,6 +708,11 @@ export const parentActions = {
     const k = el.dataset.k;
     await run(sb.from('missions').insert({ family_id: fam(), kind: k, part: el.dataset.part || 'morning', title: k === 'routine' ? 'New step' : k === 'food' ? 'New food mission' : 'New rule', points: k === 'behaviour' ? 5 : 3, checkins: k === 'behaviour' ? 3 : 1, sort: state.d.missions.length + 1 }));
     await reload();
+  },
+  async saveFocus() {
+    const a = parseInt(val('f-focus'), 10), b = parseInt(val('f-break'), 10);
+    if (!(a >= 5 && a <= 45) || !(b >= 1 && b <= 15)) return toast('Sprint 5–45 minutes, break 1–15 minutes');
+    await run(sb.from('families').update({ focus_minutes: a, break_minutes: b }).eq('id', fam()), 'Saved'); await reload();
   },
   async saveTimes() {
     const t = {};

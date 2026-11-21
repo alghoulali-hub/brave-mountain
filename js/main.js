@@ -34,9 +34,10 @@ async function start() {
   const { foodActions } = await import('./food.js');
   const { lockActions, lockView, lockOnStart, watchVisibility } = await import('./lock.js');
   const { feedActions } = await import('./feed.js');
+  const { focusActions, startTicker } = await import('./focus.js');
 
   const actions = {
-    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions, ...feedActions,
+    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions, ...feedActions, ...focusActions,
     tab: el => { state.tab = el.dataset.tab; state.modal = null; render(); window.scrollTo(0, 0); },
     closeModal: () => { state.modal = null; render(); },
     async pinForgot() { state.locked = false; state.ui.lock = null; await actions.signOut(); toast('Sign in with your email and password.'); },
@@ -109,7 +110,7 @@ async function start() {
     if (ev.key === 'Escape' && state.modal) { state.modal = null; render(); }
     if (ev.key === 'Enter' && ev.target.matches('input')) {
       const btn = ev.target.closest('.row, .card')?.querySelector('[data-act]');
-      if (btn && ['addWish', 'addAcc', 'kidSignIn', 'parentSignIn', 'bonusCustom', 'addWeight'].includes(btn.dataset.act)) { ev.preventDefault(); perform(btn.dataset.act, btn, ev); }
+      if (btn && ['addWish', 'addAcc', 'kidSignIn', 'parentSignIn', 'bonusCustom', 'addWeight', 'studyAdd', 'studyAddParent'].includes(btn.dataset.act)) { ev.preventDefault(); perform(btn.dataset.act, btn, ev); }
     }
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && state.profile) scheduleReload(); });
@@ -127,7 +128,7 @@ async function start() {
 
   render();
   await loadProfile();
-  lockOnStart(); watchVisibility();
+  lockOnStart(); watchVisibility(); startTicker();
   if (state.profile) { render(); await loadAll(); subscribe(); refreshPushStatus(); }
   render();
 

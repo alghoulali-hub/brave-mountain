@@ -7,6 +7,7 @@ import { ic } from './icons.js';
 import { pushCard } from './push.js';
 import { childFoodView } from './food.js';
 import { bellButton, feedModal } from './feed.js';
+import { focusCard, focusView } from './focus.js';
 
 const ui = () => (state.ui.kid ||= { path: 'school', tier: 'daily', feeling: null });
 const seenKey = g => `brave-seen-${g.id}`;
@@ -21,7 +22,7 @@ const seen = g => {
 // ───────── shell ─────────
 export function childView() {
   const tab = state.tab || 'mountain';
-  const views = { mountain, calm, food: childFoodView, rewards, tonight };
+  const views = { mountain, calm, food: childFoodView, rewards, tonight, focus: focusView };
   const body = (views[tab] || mountain)();
   const night = new Date().getHours() >= 19 || new Date().getHours() < 5;
   const tabs = [
@@ -218,7 +219,7 @@ function missionsCard() {
 }
 
 function mountain() {
-  return `<div class="screen">${header()}${pushCard('child')}${heartCard()}${giftCard()}${mountainCard()}${missionsCard()}</div>`;
+  return `<div class="screen">${header()}${pushCard('child')}${heartCard()}${focusCard()}${giftCard()}${mountainCard()}${missionsCard()}</div>`;
 }
 
 // ───────── Calm Corner ─────────

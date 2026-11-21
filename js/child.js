@@ -1,7 +1,7 @@
 import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, greeting, sum, render, toast, openModal, closeModal, run,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, mystery, summit, secretFor, eventsOn, earnedOn,
-  attendanceOn, logsFor, routineMissions, PARTS, currentPart, stepWindow, appliesOn, isWeekend, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
+  attendanceOn, takenThisWeek, logsFor, routineMissions, PARTS, currentPart, stepWindow, appliesOn, isWeekend, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -277,11 +277,11 @@ function rewards() {
     </section>` : ''}
 
     <section class="col" style="gap:10px"><h2 class="h2">Prize shop</h2>
-      <span class="small muted bold">Spend your points. You have ${bal}.</span>
+      <span class="small muted bold">Spend your points. You have ${bal}.${u.tier === 'weekly' ? ' Each weekly prize once a week.' : ''}</span>
       <div class="seg" role="tablist"><button data-act="kidTier" data-v="daily" class="${u.tier === 'daily' ? 'on' : ''}">Daily prizes</button><button data-act="kidTier" data-v="weekly" class="${u.tier === 'weekly' ? 'on' : ''}">Weekly prizes</button></div>
       ${list.map(r => `<div class="list-item">
         <span class="grow col tight"><span class="bold">${esc(fillP(r.name))}</span><span class="small muted bold">${r.price} pts</span></span>
-        ${bal >= r.price ? `<button class="btn sm primary" data-act="askRedeem" data-r="${r.id}">Get it</button>` : `<span class="small bold muted" style="text-align:right;max-width:100px">${r.price - bal} more to go</span>`}
+        ${takenThisWeek(r) ? `<span class="small bold" style="color:var(--teal);text-align:right;max-width:110px">Got it this week ✓<br><span class="tiny muted">Back on Monday</span></span>` : bal >= r.price ? `<button class="btn sm primary" data-act="askRedeem" data-r="${r.id}">Get it</button>` : `<span class="small bold muted" style="text-align:right;max-width:100px">${r.price - bal} more to go</span>`}
       </div>`).join('') || '<div class="empty">No prizes here yet</div>'}
     </section>
 

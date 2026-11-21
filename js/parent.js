@@ -309,7 +309,7 @@ function giftsTab() {
       <input class="input" id="new-s-title" placeholder="e.g. New bike" aria-label="Summit prize">
       <div class="row"><select class="input grow" id="new-s-path" aria-label="Path">${paths().filter(x => !summits.some(s => s.ladder_id === x.id && s.status === 'active')).map(x => `<option value="${x.id}">${esc(x.title)}</option>`).join('') || '<option value="">Every path has one</option>'}</select>
       <button class="btn sm primary" data-act="addSummit">Add</button></div></section>
-    <section class="card"><span class="h3">Prize shop</span><span class="small muted">Keep prices steady. Daily prizes should be reachable every day.</span>
+    <section class="card"><span class="h3">Prize shop</span><span class="small muted">Keep prices steady. Daily prizes should be reachable every day. Each weekly prize can be taken once a week (Monday–Sunday); declined requests don't count.</span>
       ${state.d.rewards.map(r => `<div class="col" style="gap:6px;padding:10px 0;border-top:1px solid var(--line)">
         <textarea class="input step-text" id="rn-${r.id}" rows="1" style="min-height:48px;resize:none;line-height:1.35" aria-label="Prize name">${esc(r.name)}</textarea>
         <div class="row"><input class="input" id="rp-${r.id}" type="number" inputmode="numeric" value="${r.price}" style="width:90px" aria-label="Price">

@@ -4,7 +4,7 @@ export const sb = window.supabase.createClient(cfg.url, cfg.key, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'brave-auth' }
 });
 export const KID_DOMAIN = 'kids.brave-family.app';
-export const APP_VERSION = '2.6 · 21 Nov';
+export const APP_VERSION = '2.7 · 21 Nov';
 
 export const state = {
   session: null,
@@ -58,6 +58,7 @@ export async function run(promise, okMsg) {
 }
 export function friendly(m = '') {
   if (/Not enough points/i.test(m)) return 'Not enough points yet. Keep going!';
+  if (/already taken this week/i.test(m)) return 'You already got this weekly prize. It comes back on Monday!';
   if (/Invalid login/i.test(m)) return 'Wrong username/email or password.';
   if (/already registered|already used/i.test(m)) return 'That login already exists.';
   if (/Password should be/i.test(m)) return 'Password needs at least 6 characters.';
@@ -195,6 +196,12 @@ export function stepWindow(m) {
 }
 export function currentPart() { const h = new Date().getHours(); return h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 19 ? 'evening' : 'bedtime'; }
 export function behaviourMissions() { return state.d.missions.filter(m => m.kind === 'behaviour' && m.active); }
+// Weekly prizes can be taken once per week (Mon–Sun). Declined requests don't count.
+export function takenThisWeek(r) {
+  if (r.tier !== 'weekly') return false;
+  const mon = mondayOf(today());
+  return state.d.redemptions.some(x => x.reward_id === r.id && ['claimed', 'approved', 'used'].includes(x.status) && localDay(x.created_at) >= mon);
+}
 export function childProfile() { return state.d.profiles.find(p => p.role === 'child') || null; }
 export function heartsToday() { const t = today(); return state.d.hearts.filter(h => localDay(h.created_at) === t); }
 export function schoolStreak() {

@@ -1,7 +1,7 @@
 import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, localDay, sum, render, toast, openModal, closeModal, run, friendly,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, readiness, mystery, summit, secretFor, eventsOn, earnedOn,
-  attendanceOn, logsFor, routineMissions, PARTS, currentPart, behaviourMissions, childProfile, heartsToday, loadAll, KID_DOMAIN, uid
+  attendanceOn, logsFor, routineMissions, PARTS, currentPart, appliesOn, isWeekend, partTimes, behaviourMissions, childProfile, heartsToday, loadAll, KID_DOMAIN, uid
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -56,6 +56,7 @@ function todayTab() {
   }).join('');
 
   const recordRows = paths().map(l => {
+    if (l.kind === 'school' && isWeekend(t) && !attemptOn(currentStep(l) || stepsOf(l).slice(-1)[0] || {}, t)) return `<div class="row between small"><span class="bold">${esc(l.title)}</span><span class="muted bold">Weekend · no school step</span></div>`;
     const top = !currentStep(l);
     const s = currentStep(l) || stepsOf(l).slice(-1)[0];
     if (!s) return '';
@@ -82,18 +83,22 @@ function todayTab() {
       }).join('')}</div></div>`;
   }).join('');
 
-  const routine = routineMissions();
-  const pendingLogs = routine.flatMap(m => logsFor(m, t).filter(l => l.status === 'pending'));
+  // "next morning" steps (stayed in bed all night) belong to the night: on Today show last night's
+  const stepDate = m => m.timing === 'next_morning' && isToday ? addDays(t, -1) : t;
+  const routine = routineMissions().filter(m => appliesOn(m, stepDate(m)));
+  const pendingLogs = routine.flatMap(m => logsFor(m, stepDate(m)).filter(l => l.status === 'pending'));
   const routineRow = m => {
-    const l = logsFor(m, t)[0];
-    return `<div class="row"><span class="grow small bold">${esc(m.title)}</span>
-      ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}">Mark done</button>` :
-        l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button>` :
+    const d = stepDate(m);
+    const l = logsFor(m, d)[0];
+    const label = m.timing === 'next_morning' && isToday ? `${m.title} (last night)` : m.title;
+    return `<div class="row"><span class="grow small bold">${esc(label)}</span>
+      ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}" data-date="${d}">Mark done</button>` :
+        l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button><button class="icon-btn" style="background:var(--soft);width:40px;height:40px" data-act="notDone" data-l="${l.id}" aria-label="Not done yet">${ic.close(16)}</button>` :
         `<span class="small bold" style="color:var(--teal)">✓ +${m.points}</span>`}</div>`;
   };
   const routineRows = PARTS.map(([part, label]) => {
-    const list = routineMissions(part); if (!list.length) return '';
-    const done = list.filter(m => logsFor(m, t)[0]).length;
+    const list = routine.filter(m => (m.part || 'morning') === part); if (!list.length) return '';
+    const done = list.filter(m => logsFor(m, stepDate(m))[0]).length;
     return `<div class="row between" style="margin-top:4px"><span class="small bold" style="color:var(--primary)">${label}${isToday && part === currentPart() ? ' · now' : ''}</span><span class="tiny muted bold">${done}/${list.length}</span></div>${list.map(routineRow).join('')}`;
   }).join('<div class="divider"></div>');
 
@@ -110,15 +115,16 @@ function todayTab() {
       <div class="col tight" style="align-items:flex-end"><span class="small muted bold">Balance</span><span class="display" style="font-size:22px">${state.d.balance}</span></div></div>
     ${isToday && state.ui.push && state.ui.push !== 'on' ? pushCard('parent') : ''}
     ${confirmCards}
-    <section class="card"><span class="h3">School ${isToday ? 'today' : 'that day'}</span>
+    <section class="card">${isWeekend(t) && !att ? `<div class="row" style="gap:10px">${ic.sun(20, 'var(--sun-ink)')}<span class="h3">Weekend · no school</span></div>` : `<span class="h3">School ${isToday ? 'today' : 'that day'}</span>
       <div class="grid3">${[['went', 'Went', '+20'], ['partly', 'Part of day', '+10'], ['no', "Didn't go", '0']].map(([v, l, p]) =>
         `<button class="choice ${att?.status === v ? 'on' : ''}" data-act="setSchool" data-v="${v}" aria-pressed="${att?.status === v}"><span>${l}</span><span class="tiny">${p}</span></button>`).join('')}</div>
-      ${att?.status === 'no' ? `<span class="small muted bold">No points lost. Tomorrow is a fresh start.</span>` : ''}
+      ${att?.status === 'no' ? `<span class="small muted bold">No points lost. Tomorrow is a fresh start.</span>` : ''}`}
       <div class="divider"></div><span class="h3">Brave steps</span>${recordRows}
     </section>
     ${behaviour ? `<section class="card">${behaviour}</section>` : ''}
     ${parentFoodCard(t)}
-    <section class="card"><div class="row between"><span class="h3">Routines</span>${pendingLogs.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>${routineRows || '<span class="small muted">No routine steps</span>'}</section>
+    <section class="card"><div class="row between"><span class="h3">Routines</span>${pendingLogs.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>
+      ${pendingLogs.length ? `<span class="tiny muted">Tap ✕ if a ticked step isn't done yet. ${esc(kid())} gets a gentle "not yet" and can tick it again later.</span>` : ''}${routineRows || '<span class="small muted">No routine steps</span>'}</section>
     <section class="col"><span class="h3">Quick bonus</span>
       <div class="grid2">${[['Brave moment', 10], ['Calmed down', 5], ['Kind act', 5], ['Tried something hard', 5]].map(([l, p]) =>
         `<button class="card" style="border:none;flex-direction:row;align-items:center;justify-content:space-between;padding:14px" data-act="bonus" data-r="${l}" data-p="${p}"><span class="bold small" style="text-align:left">${l}</span><span class="tag primary" style="background:var(--primary);color:#fff">+${p}</span></button>`).join('')}</div>
@@ -324,6 +330,8 @@ function settingsTab() {
     <textarea class="input step-text" id="mt-${m.id}" rows="1" style="min-height:48px;resize:none;line-height:1.35" aria-label="Mission name">${esc(m.title)}</textarea>
     <div class="row"><label class="small bold">Points <input class="input" id="mp-${m.id}" type="number" inputmode="numeric" value="${m.points}" style="width:76px"></label>
       ${m.kind === 'behaviour' ? `<label class="small bold">Check-ins <input class="input" id="mc-${m.id}" type="number" inputmode="numeric" value="${m.checkins}" min="1" max="5" style="width:70px"></label>` : ''}
+      ${m.kind === 'routine' ? `<label class="row small bold" style="gap:6px"><input type="checkbox" id="ms-${m.id}" ${m.school_only ? 'checked' : ''}> School days only</label>` : ''}
+      ${m.kind === 'routine' && m.part === 'bedtime' ? `<label class="row small bold" style="gap:6px"><input type="checkbox" id="mn-${m.id}" ${m.timing === 'next_morning' ? 'checked' : ''}> Tick next morning</label>` : ''}
       <button class="btn sm primary" data-act="saveMission" data-m="${m.id}">Save</button><button class="icon-btn" style="background:var(--soft)" data-act="delMission" data-m="${m.id}" aria-label="Delete">${ic.trash(16)}</button></div></div>`;
   return `${head('Settings')}
     ${pinCard()}
@@ -346,6 +354,10 @@ function settingsTab() {
       <div class="field"><label for="f-safety">Safety plan (shown in the Calm Corner)</label><textarea class="input" id="f-safety" style="min-height:160px">${esc(f.safety_plan || '')}</textarea><span class="tiny muted">{P} becomes "${esc(P())}". Replace the [name] with a real trusted adult.</span></div>
       <button class="btn primary" data-act="saveFamily">Save</button>
     </section>
+    <section class="card"><span class="h3">Routine times</span><span class="small muted">${esc(kid())} can only tick a routine during its time. You can always mark steps yourself.</span>
+      ${PARTS.map(([part, label]) => { const [a, b] = partTimes(part); return `<div class="row wrap" style="gap:8px"><span class="small bold" style="width:120px">${label}</span>
+        <input class="input" type="time" id="rt-from-${part}" value="${a}" style="width:auto" aria-label="${label} opens"><span class="small">to</span><input class="input" type="time" id="rt-to-${part}" value="${b}" style="width:auto" aria-label="${label} closes"></div>`; }).join('')}
+      <button class="btn sm primary" data-act="saveTimes">Save times</button></section>
     ${PARTS.map(([part, label]) => `<section class="card"><span class="h3">${label}</span>${routineMissions(part).map(missionRow).join('')}
       <button class="btn sm ghost" data-act="addMission" data-k="routine" data-part="${part}">${ic.plus(16)} Add step</button></section>`).join('')}
     <section class="card"><span class="h3">Food missions</span><span class="small muted">Healthy habits that earn points. No weight goals here.</span>${foodMissions().map(missionRow).join('')}
@@ -361,7 +373,41 @@ function settingsTab() {
 }
 
 // ───────── Modals ─────────
+// Ask before actions that give or take points or prizes
+export function confirmText(name, el) {
+  const d = el.dataset;
+  const mis = id => state.d.missions.find(x => x.id === id);
+  const log = id => state.d.logs.find(x => x.id === id);
+  const red = id => state.d.redemptions.find(x => x.id === id);
+  const k = esc(kid());
+  switch (name) {
+    case 'acceptPrize': { const r = red(d.r); return r && { title: `Accept "${esc(fillP(r.name))}"?`, body: `It goes to ${k}'s My prizes as a ticket, ready to use.`, yes: 'Yes, accept' }; }
+    case 'declinePrize': { const r = red(d.r); return r && { title: `Decline "${esc(fillP(r.name))}"?`, body: `${k} gets his ${r.price} points back.`, yes: 'Decline and refund' }; }
+    case 'markUsed': { const r = red(d.r); return r && { title: `Mark "${esc(fillP(r.name))}" as used?`, body: `It disappears from ${k}'s list.`, yes: 'Yes, used' }; }
+    case 'approveLog': { const l = log(d.l); const m = l && mis(l.mission_id); return m && { title: `Approve "${esc(m.title)}"?`, body: `${k} gets +${m.points} points.`, yes: `Approve +${m.points}` }; }
+    case 'approveAll': {
+      const yest = addDays(today(), -1);
+      const ls = state.d.logs.filter(l => l.status === 'pending' && (l.log_date === selDay() || (selDay() === today() && l.log_date === yest && mis(l.mission_id)?.timing === 'next_morning')));
+      const pts = ls.reduce((a, l) => a + (mis(l.mission_id)?.points || 0), 0);
+      return { title: `Approve all ${ls.length} ticked steps?`, body: ls.map(l => '• ' + esc(mis(l.mission_id)?.title || '')).join('<br>') + `<br><br>${k} gets +${pts} points.`, yes: 'Approve all' };
+    }
+    case 'setResult': case 'recordStep': {
+      const label = { done: 'Done (+30 points)', tried: 'Tried (+10 points)', not: 'Not today (no points, nothing lost)' }[d.v];
+      return { title: `Mark this brave step as ${label.split(' (')[0]}?`, body: label.includes('(') ? label.slice(label.indexOf('(') + 1, -1) : '', yes: 'Yes' };
+    }
+    case 'routineMark': { const m = mis(d.m); return m && { title: `Mark "${esc(m.title)}" as done?`, body: `${k} gets +${m.points} points.`, yes: 'Yes, done' }; }
+    default: return null;
+  }
+}
+
 export function parentModal(m) {
+  if (m.kind === 'confirm') {
+    const attrs = Object.entries(m.data || {}).filter(([key]) => key !== 'act' && key !== 'confirmed')
+      .map(([key, v]) => `data-${key.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${esc(v)}"`).join(' ');
+    return `<div class="modal" role="alertdialog" aria-modal="true" aria-label="Please confirm"><span class="h2">${m.title}</span>
+      ${m.body ? `<p class="muted" style="margin:0">${m.body}</p>` : ''}
+      <div class="grid2"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn primary" data-act="${m.act}" ${attrs} data-confirmed="1">${m.yes}</button></div></div>`;
+  }
   if (m.kind === 'feed') return feedModal(m);
   if (m.kind === 'climb') {
     const l = ladder(ui().path) || paths()[0]; const cur = currentStep(l); const next = stepsOf(l).find(s => s.position === cur.position + 1);
@@ -450,10 +496,13 @@ export const parentActions = {
     else await run(sb.from('mission_logs').delete().eq('id', l.id));
     await reload();
   },
-  async routineMark(el) { await run(sb.from('mission_logs').insert({ family_id: fam(), mission_id: el.dataset.m, log_date: selDay(), slot: 1, status: 'approved' })); await reload(); },
+  async routineMark(el) { await run(sb.from('mission_logs').insert({ family_id: fam(), mission_id: el.dataset.m, log_date: el.dataset.date || selDay(), slot: 1, status: 'approved' })); await reload(); },
+  async notDone(el) { await run(sb.from('mission_logs').delete().eq('id', el.dataset.l), `Removed. ${kid()} can tick it again once it's done.`); await reload(); },
   async approveLog(el) { await run(sb.from('mission_logs').update({ status: 'approved' }).eq('id', el.dataset.l)); await reload(); },
   async approveAll() {
-    const ids = state.d.logs.filter(l => l.status === 'pending' && l.log_date === selDay()).map(l => l.id);
+    const yest = addDays(today(), -1);
+    const ids = state.d.logs.filter(l => l.status === 'pending' && (l.log_date === selDay() ||
+      (selDay() === today() && l.log_date === yest && state.d.missions.find(m => m.id === l.mission_id)?.timing === 'next_morning'))).map(l => l.id);
     if (ids.length) await run(sb.from('mission_logs').update({ status: 'approved' }).in('id', ids), 'All approved');
     await reload();
   },
@@ -642,6 +691,7 @@ export const parentActions = {
     const id = el.dataset.m; const m = state.d.missions.find(x => x.id === id);
     const patch = { title: val('mt-' + id).replace(/\s*\n\s*/g, ' '), points: parseInt(val('mp-' + id), 10) || 0 };
     if (m.kind === 'behaviour') patch.checkins = Math.min(5, Math.max(1, parseInt(val('mc-' + id), 10) || 1));
+    if (m.kind === 'routine') { patch.school_only = !!document.getElementById('ms-' + id)?.checked; patch.timing = document.getElementById('mn-' + id)?.checked ? 'next_morning' : 'part'; }
     await run(sb.from('missions').update(patch).eq('id', id), 'Saved'); await reload();
   },
   async delMission(el) { await run(sb.from('missions').update({ active: false }).eq('id', el.dataset.m), 'Removed'); await reload(); },
@@ -649,6 +699,15 @@ export const parentActions = {
     const k = el.dataset.k;
     await run(sb.from('missions').insert({ family_id: fam(), kind: k, part: el.dataset.part || 'morning', title: k === 'routine' ? 'New step' : k === 'food' ? 'New food mission' : 'New rule', points: k === 'behaviour' ? 5 : 3, checkins: k === 'behaviour' ? 3 : 1, sort: state.d.missions.length + 1 }));
     await reload();
+  },
+  async saveTimes() {
+    const t = {};
+    for (const [part] of PARTS) {
+      const a = document.getElementById('rt-from-' + part)?.value, b = document.getElementById('rt-to-' + part)?.value;
+      if (!a || !b || a >= b) return toast('Each routine needs a start time before its end time');
+      t[part] = [a, b];
+    }
+    await run(sb.from('families').update({ routine_times: t }).eq('id', fam()), 'Times saved'); await reload();
   },
   async makeInvite() { const { data, error } = await sb.rpc('make_invite'); if (error) return toast(friendly(error.message)); state.ui.invite = data; render(); },
   noop: () => {}

@@ -4,7 +4,7 @@ export const sb = window.supabase.createClient(cfg.url, cfg.key, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'brave-auth' }
 });
 export const KID_DOMAIN = 'kids.brave-family.app';
-export const APP_VERSION = '2.5 · 20 Nov';
+export const APP_VERSION = '2.6 · 21 Nov';
 
 export const state = {
   session: null,
@@ -168,6 +168,31 @@ export function attendanceOn(dateStr) { return state.d.attendance.find(a => a.da
 export function logsFor(mission, dateStr = today()) { return state.d.logs.filter(l => l.mission_id === mission.id && l.log_date === dateStr); }
 export function routineMissions(part) { return state.d.missions.filter(m => m.kind === 'routine' && m.active && (!part || (m.part || 'morning') === part)); }
 export const PARTS = [['morning', 'Morning routine'], ['evening', 'Evening routine'], ['bedtime', 'Bedtime routine']];
+export const isWeekend = d => { const w = new Date(d + 'T12:00:00').getDay(); return w === 0 || w === 6; };
+export const isSchoolDay = d => !isWeekend(d);
+// Does this routine step apply on this day? School-only morning steps need a school day today;
+// school-only evening/bedtime steps ("for tomorrow") need a school day tomorrow.
+export function appliesOn(m, d) {
+  if (!m.school_only) return true;
+  return (m.part || 'morning') === 'morning' ? isSchoolDay(d) : isSchoolDay(addDays(d, 1));
+}
+const DEFAULT_TIMES = { morning: ['05:00', '11:30'], evening: ['15:00', '20:30'], bedtime: ['19:00', '23:59'] };
+export function partTimes(part) { const t = state.family?.routine_times || {}; return t[part] || DEFAULT_TIMES[part]; }
+const hm = s => { const [h, m] = String(s).split(':').map(Number); return h * 60 + (m || 0); };
+const nowMin = () => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); };
+// Can Taym tick this step right now? Returns { open, date, note }
+export function stepWindow(m) {
+  if (m.timing === 'next_morning') {
+    const [a, b] = partTimes('morning');
+    const open = nowMin() >= hm(a) && nowMin() <= hm(b);
+    return { open, date: addDays(today(), -1), note: open ? 'For last night' : `Tick it tomorrow morning (from ${a})` };
+  }
+  const [a, b] = partTimes(m.part || 'morning');
+  const n = nowMin();
+  if (n < hm(a)) return { open: false, date: today(), note: `Opens at ${a}` };
+  if (n > hm(b)) return { open: false, date: today(), note: `Closed at ${b}` };
+  return { open: true, date: today(), note: '' };
+}
 export function currentPart() { const h = new Date().getHours(); return h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 19 ? 'evening' : 'bedtime'; }
 export function behaviourMissions() { return state.d.missions.filter(m => m.kind === 'behaviour' && m.active); }
 export function childProfile() { return state.d.profiles.find(p => p.role === 'child') || null; }

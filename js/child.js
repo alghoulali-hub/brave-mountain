@@ -1,7 +1,7 @@
 import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, greeting, sum, render, toast, openModal, closeModal, run,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, mystery, summit, secretFor, eventsOn, earnedOn,
-  attendanceOn, logsFor, routineMissions, PARTS, currentPart, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
+  attendanceOn, logsFor, routineMissions, PARTS, currentPart, stepWindow, appliesOn, isWeekend, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -108,7 +108,9 @@ function braveStepBlock(l, cur, practice = false) {
   const att = todaysAttempt(cur);
   const done = attemptsOf(cur).filter(a => a.result === 'done').length;
   let action = '';
-  if (!att) {
+  if (l.kind === 'school' && isWeekend(today()) && !att) {
+    action = `<div class="row" style="background:#fff;border-radius:14px;padding:10px 12px">${ic.sun(20, 'var(--sun-ink)')}<span class="small bold">It's the weekend! No school step today. Enjoy your rest.</span></div>`;
+  } else if (!att) {
     action = `<button class="btn primary block" data-act="startBrave" data-step="${cur.id}">Start brave step</button>`;
   } else if (att.result == null && att.fear_after == null) {
     action = `<div class="small bold">Go be brave! You've got this.</div>
@@ -156,13 +158,31 @@ function mountainCard() {
   </section>`;
 }
 
+// Steps shown for a part today. "Next morning" steps (like "Stayed in my own bed all night")
+// show in the morning, for last night, and also at bedtime as a reminder.
+function partSteps(part) {
+  const t = today();
+  return state.d.missions.filter(m => m.kind === 'routine' && m.active && (
+    m.timing === 'next_morning' ? (part === 'morning' || part === 'bedtime') : (m.part || 'morning') === part
+  ) && appliesOn(m, m.timing === 'next_morning' && part === 'morning' ? addDays(t, -1) : t))
+    .sort((a, b) => (a.timing === 'next_morning' && part === 'morning' ? -1 : 0) - (b.timing === 'next_morning' && part === 'morning' ? -1 : 0) || a.sort - b.sort);
+}
 function routineItems(part) {
-  return routineMissions(part).map(m => {
-    const log = logsFor(m)[0];
+  return partSteps(part).map(m => {
+    if (m.timing === 'next_morning' && part === 'bedtime') {
+      // at bedtime this is only a reminder; it is ticked the next morning
+      return `<div class="list-item" style="opacity:.75"><span class="check">${ic.sun(18, 'var(--sun-ink)')}</span>
+        <span class="grow col tight"><span class="bold">${esc(m.title)}</span><span class="small muted">Tick it tomorrow morning · +${m.points}</span></span></div>`;
+    }
+    const w = stepWindow(m);
+    const log = logsFor(m, w.date)[0];
     const cls = !log ? '' : log.status === 'approved' ? 'ok' : log.status === 'pending' ? 'pending' : '';
-    return `<button class="list-item" style="border:none;width:100%;text-align:left" data-act="toggleRoutine" data-m="${m.id}" aria-pressed="${!!log}">
-      <span class="check ${cls}">${log ? ic.check(20, log.status === 'approved' ? 'var(--ink)' : 'var(--sun-ink)') : ''}</span>
-      <span class="grow col tight"><span class="bold">${esc(m.title)}</span><span class="small muted">${!log ? `+${m.points}` : log.status === 'approved' ? `Approved · +${m.points}` : `Waiting for ${esc(P())}`}</span></span>
+    const locked = !log && !w.open;
+    const title = m.timing === 'next_morning' && part === 'morning' ? `Last night: ${m.title}` : m.title;
+    const sub = log ? (log.status === 'approved' ? `Approved · +${m.points}` : `Waiting for ${esc(P())}`) : locked ? `🔒 ${w.note}` : `+${m.points}${w.note ? ' · ' + w.note : ''}`;
+    return `<button class="list-item" style="border:none;width:100%;text-align:left;${locked ? 'opacity:.6' : ''}" data-act="toggleRoutine" data-m="${m.id}" aria-pressed="${!!log}" ${locked ? 'aria-disabled="true"' : ''}>
+      <span class="check ${cls}">${log ? ic.check(20, log.status === 'approved' ? 'var(--ink)' : 'var(--sun-ink)') : locked ? ic.lock(16, 'var(--muted)') : ''}</span>
+      <span class="grow col tight"><span class="bold">${esc(title)}</span><span class="small muted">${sub}</span></span>
     </button>`;
   }).join('');
 }
@@ -172,9 +192,9 @@ function missionsCard() {
   const att = attendanceOn(t);
   const open = ui().openPart || currentPart();
   const sections = PARTS.map(([part, label]) => {
-    const list = routineMissions(part);
+    const list = partSteps(part);
     if (!list.length) return '';
-    const done = list.filter(m => logsFor(m)[0]).length;
+    const done = list.filter(m => !(m.timing === 'next_morning' && part === 'bedtime') && logsFor(m, stepWindow(m).date)[0]).length;
     const isOpen = part === open, now = part === currentPart();
     return `<button class="list-item" style="border:none;width:100%;text-align:left;background:${isOpen ? 'var(--primary-tint)' : '#fff'}" data-act="kidPart" data-v="${part}" aria-expanded="${isOpen}">
         <span class="ico" style="background:${part === 'bedtime' ? 'var(--primary-soft)' : 'var(--sun-soft)'}">${part === 'bedtime' ? ic.moon(20, 'var(--primary)') : ic.sun(20, 'var(--sun-ink)')}</span>
@@ -188,7 +208,7 @@ function missionsCard() {
     return `<div class="list-item"><span class="ico" style="background:var(--teal-soft)">${ic.heart(20, 'var(--teal)')}</span>
       <span class="grow col tight"><span class="bold">${esc(m.title)}</span><span class="small muted">${ok} of ${m.checkins} check-ins · +${m.points} each</span></span></div>`;
   }).join('');
-  const school = `<div class="list-item"><span class="ico" style="background:var(--primary-soft)">${ic.school(20, 'var(--primary)')}</span>
+  const school = isWeekend(t) ? '' : `<div class="list-item"><span class="ico" style="background:var(--primary-soft)">${ic.school(20, 'var(--primary)')}</span>
     <span class="grow col tight"><span class="bold">Made it to school</span><span class="small muted">${att ? (att.status === 'went' ? 'Yes! +20' : att.status === 'partly' ? 'Part of the day +10' : 'Fresh start tomorrow') : `${esc(P())} confirms · +20`}</span></span></div>`;
   return `<section class="col" style="gap:10px">
     <h2 class="h2">Today's missions</h2>
@@ -294,7 +314,7 @@ function tonight() {
   const streak = schoolStreak();
   return `<div class="screen night">
     <header class="row between top"><div class="col tight"><span class="small bold" style="color:#C9D2FF">${new Date().toLocaleDateString('en-GB', { weekday: 'long' })}</span><span class="h1">Today's wins, ${esc(kid())}</span></div>${ic.moon(34, '#FFD27A')}</header>
-    ${routineMissions('bedtime').length ? `<section class="col" style="gap:8px"><span class="bold">Bedtime routine · ${routineMissions('bedtime').filter(m => logsFor(m)[0]).length} of ${routineMissions('bedtime').length}</span>
+    ${partSteps('bedtime').length ? `<section class="col" style="gap:8px"><span class="bold">Bedtime routine · ${partSteps('bedtime').filter(m => logsFor(m, stepWindow(m).date)[0]).length} of ${partSteps('bedtime').length}</span>
       <div class="col night-list" style="gap:8px">${routineItems('bedtime')}</div></section>` : ''}
     <section class="card glass" style="gap:8px">
       <div class="row between"><span class="small bold" style="color:#C9D2FF">Points today</span><span class="display" style="font-size:30px;color:var(--sun)">+${total}</span></div>
@@ -461,10 +481,12 @@ export const childActions = {
   },
   async toggleRoutine(el) {
     const m = state.d.missions.find(x => x.id === el.dataset.m);
-    const log = logsFor(m)[0];
+    const w = m.kind === 'routine' ? stepWindow(m) : { open: true, date: today() };
+    const log = logsFor(m, w.date)[0];
     if (log && log.status !== 'pending') return toast(log.status === 'approved' ? 'Already approved!' : `Ask ${P()} about this one`);
+    if (!log && !w.open) return toast(`Not yet! ${w.note}. Tick it after you've done it.`);
     if (log) await run(sb.from('mission_logs').delete().eq('id', log.id));
-    else await run(sb.from('mission_logs').insert({ family_id: state.profile.family_id, mission_id: m.id, log_date: today(), slot: 1, status: 'pending' }));
+    else await run(sb.from('mission_logs').insert({ family_id: state.profile.family_id, mission_id: m.id, log_date: w.date, slot: 1, status: 'pending' }));
     await loadAll(); render();
   },
   openBreathe: () => {

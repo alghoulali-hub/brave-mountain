@@ -68,8 +68,8 @@ export function parentFoodCard(day) {
   const rows = fm.map(m => {
     const l = logsFor(m, t)[0];
     return `<div class="row"><span class="grow small bold">${esc(m.title)}</span>
-      ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}">Mark done</button>` :
-        l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button>` :
+      ${!l ? `<button class="btn sm ghost" data-act="routineMark" data-m="${m.id}" data-date="${t}">Mark done</button>` :
+        l.status === 'pending' ? `<button class="btn sm teal" data-act="approveLog" data-l="${l.id}">Approve +${m.points}</button><button class="icon-btn" style="background:var(--soft);width:40px;height:40px" data-act="notDone" data-l="${l.id}" aria-label="Not done yet">${ic.close(16)}</button>` :
         `<span class="small bold" style="color:var(--teal)">✓ +${m.points}</span>`}</div>`;
   }).join('');
   return `<section class="card"><div class="row between"><span class="h3">Healthy food</span>${pending.length > 1 ? `<button class="btn sm teal" data-act="approveAll">Approve all</button>` : ''}</div>

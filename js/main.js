@@ -29,7 +29,7 @@ async function start() {
   const { state, sb, setRenderer, loadProfile, loadAll, subscribe, unsubscribe, scheduleReload, esc, toast } = core;
   const { authView, noProfileView, authActions } = await import('./auth.js');
   const { childView, childModal, childActions } = await import('./child.js');
-  const { parentView, parentModal, parentActions } = await import('./parent.js');
+  const { parentView, parentModal, parentActions, confirmText } = await import('./parent.js');
   const { pushActions, refreshPushStatus, disablePush } = await import('./push.js');
   const { foodActions } = await import('./food.js');
   const { lockActions, lockView, lockOnStart, watchVisibility } = await import('./lock.js');
@@ -85,6 +85,10 @@ async function start() {
     const fn = actions[name];
     if (!fn) return;
     if (state.locked && !['pinKey', 'pinForgot'].includes(name)) return;
+    if (state.profile?.role === 'parent') {
+      if (el.dataset.confirmed) state.modal = null;
+      else { const c = confirmText(name, el); if (c) { state.modal = { kind: 'confirm', act: name, data: { ...el.dataset }, ...c }; render(); return; } }
+    }
     if (el.tagName === 'BUTTON') el.disabled = true;
     acting = true;
     try { await fn(el, ev); } catch (e) { console.error(e); }

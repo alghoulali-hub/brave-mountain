@@ -2,6 +2,7 @@ import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, greeting, sum, render, toast, openModal, closeModal, run,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, mystery, summit, secretFor, eventsOn, earnedOn,
   attendanceOn, takenThisWeek, logsFor, routineMissions, PARTS, currentPart, stepWindow, appliesOn, isWeekend, behaviourMissions, heartsToday, schoolStreak, scheduleReload, loadAll
+  , cleanUrl, wishLink
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -296,8 +297,9 @@ function rewards() {
     </section>` : ''}
     <section class="col">
       <div class="row between"><h2 class="h2">My wish list</h2></div>
-      <div class="row"><input class="input grow" id="wish-text" maxlength="120" placeholder="Something I'd love…" aria-label="New wish"><button class="btn sm primary" data-act="addWish">Add</button></div>
-      ${state.d.wishes.map(w => `<div class="list-item">${ic.heartFill(18)}<span class="grow bold">${esc(w.text)}</span><button class="icon-btn" style="background:var(--soft)" data-act="delWish" data-w="${w.id}" aria-label="Remove wish">${ic.close(18)}</button></div>`).join('')}
+      <div class="col" style="gap:8px"><input class="input" id="wish-text" maxlength="120" placeholder="Something I'd love…" aria-label="New wish">
+        <div class="row"><input class="input grow" id="wish-url" type="url" inputmode="url" maxlength="1000" placeholder="Link to it on a website (optional)" aria-label="Link (optional)"><button class="btn sm primary" data-act="addWish">Add</button></div></div>
+      ${state.d.wishes.map(w => `<div class="list-item" style="align-items:flex-start">${ic.heartFill(18)}<span class="grow col tight wrap-any"><span class="bold">${esc(w.text)}</span>${wishLink(w)}</span><button class="icon-btn" style="background:var(--soft)" data-act="delWish" data-w="${w.id}" aria-label="Remove wish">${ic.close(18)}</button></div>`).join('')}
       <span class="small muted">${esc(P())} sees your wishes and might hide one in your treasure chest.</span>
     </section>
   </div>`;
@@ -523,8 +525,10 @@ export const childActions = {
   },
   async addWish() {
     const text = (document.getElementById('wish-text')?.value || '').trim();
-    if (!text) return;
-    await run(sb.from('wishes').insert({ family_id: state.profile.family_id, text }), 'Added to your wish list');
+    const url = cleanUrl(document.getElementById('wish-url')?.value);
+    if (url === null) return toast('That link doesn\'t look right. Copy it from the website address bar.');
+    if (!text && !url) return;
+    await run(sb.from('wishes').insert({ family_id: state.profile.family_id, text: text || 'Gift from a website', url: url || null }), 'Added to your wish list');
     await loadAll(); render();
   },
   async delWish(el) { await run(sb.from('wishes').delete().eq('id', el.dataset.w)); await loadAll(); render(); },

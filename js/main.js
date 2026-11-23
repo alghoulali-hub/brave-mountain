@@ -108,6 +108,7 @@ async function start() {
   });
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && state.modal) { state.modal = null; render(); }
+    if (ev.key === 'Enter' && ev.target.id === 'wish-text') { ev.preventDefault(); document.getElementById('wish-url')?.focus(); return; }
     if (ev.key === 'Enter' && ev.target.matches('input')) {
       const btn = ev.target.closest('.row, .card')?.querySelector('[data-act]');
       if (btn && ['addWish', 'addAcc', 'kidSignIn', 'parentSignIn', 'bonusCustom', 'addWeight', 'studyAdd', 'studyAddParent'].includes(btn.dataset.act)) { ev.preventDefault(); perform(btn.dataset.act, btn, ev); }

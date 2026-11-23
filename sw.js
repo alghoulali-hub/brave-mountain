@@ -1,6 +1,6 @@
 // Keeps the app shell available so it opens fast, and shows phone notifications.
 // Data always comes live from Supabase.
-const CACHE = 'brave-v18';
+const CACHE = 'brave-v19';
 const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'js/main.js', 'js/core.js', 'js/icons.js', 'js/auth.js', 'js/child.js', 'js/parent.js', 'js/push.js', 'js/food.js', 'js/lock.js', 'js/feed.js', 'js/focus.js', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', e => {

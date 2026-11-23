@@ -4,7 +4,7 @@ export const sb = window.supabase.createClient(cfg.url, cfg.key, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'brave-auth' }
 });
 export const KID_DOMAIN = 'kids.brave-family.app';
-export const APP_VERSION = '2.8 · 21 Nov';
+export const APP_VERSION = '2.9 · 23 Nov';
 
 export const state = {
   session: null,
@@ -212,4 +212,16 @@ export function schoolStreak() {
   // consecutive weekdays (latest first) marked 'went'
   const days = state.d.attendance.filter(a => new Date(a.day + 'T12:00:00').getDay() % 6 !== 0).sort((a, b) => b.day.localeCompare(a.day));
   let n = 0; for (const a of days) { if (a.status === 'went') n++; else break; } return n;
+}
+
+// A wish link: only real web addresses (http/https), shown as a tappable link that wraps inside its box.
+export function cleanUrl(v) {
+  v = (v || '').trim(); if (!v) return '';
+  if (!/^https?:\/\//i.test(v) && /^[\w-]+(\.[\w-]+)+/.test(v)) v = 'https://' + v;
+  try { const u = new URL(v); return /^https?:$/.test(u.protocol) && !/\s/.test(v) ? u.href : null; } catch { return null; }
+}
+export function wishLink(w, size = 'small') {
+  if (!w.url) return '';
+  let host = w.url; try { host = new URL(w.url).hostname.replace(/^www\./, ''); } catch {}
+  return `<a class="${size} bold wish-link" href="${esc(w.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(host)}<span class="tiny muted" style="display:block;font-weight:600">${esc(w.url)}</span></a>`;
 }

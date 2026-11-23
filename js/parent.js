@@ -2,6 +2,7 @@ import {
   sb, state, esc, APP_VERSION, paths, summitFor, P, fillP, kid, today, mondayOf, addDays, localDay, sum, render, toast, openModal, closeModal, run, friendly,
   ladder, stepsOf, currentStep, attemptsOf, todaysAttempt, readiness, mystery, summit, secretFor, eventsOn, earnedOn,
   attendanceOn, logsFor, routineMissions, PARTS, currentPart, appliesOn, isWeekend, partTimes, behaviourMissions, childProfile, heartsToday, loadAll, KID_DOMAIN, uid
+  , wishLink
 } from './core.js';
 import { ic } from './icons.js';
 import { pushCard } from './push.js';
@@ -324,7 +325,7 @@ function giftsTab() {
         <input class="input" id="new-r-name" placeholder="e.g. Ice cream trip">
         <div class="row"><input class="input" id="new-r-price" type="number" inputmode="numeric" placeholder="Points" style="width:100px"><select class="input" id="new-r-tier" style="width:auto"><option value="daily">Daily</option><option value="weekly">Weekly</option></select><button class="btn sm primary grow" data-act="addReward">Add</button></div></div>
     </section>
-    <section class="card"><span class="h3">${esc(kid())}'s wish list</span>${state.d.wishes.length ? state.d.wishes.map(w => `<div class="row small bold">${ic.heartFill(16)} ${esc(w.text)}</div>`).join('') : '<div class="empty">Nothing yet</div>'}</section>`;
+    <section class="card"><span class="h3">${esc(kid())}'s wish list</span>${state.d.wishes.length ? state.d.wishes.map(w => `<div class="row small bold" style="align-items:flex-start">${ic.heartFill(16)}<span class="grow col tight wrap-any"><span>${esc(w.text)}</span>${wishLink(w, 'tiny')}</span></div>`).join('') : '<div class="empty">Nothing yet</div>'}</section>`;
 }
 
 // ───────── Settings ─────────

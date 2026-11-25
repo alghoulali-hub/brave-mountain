@@ -8,6 +8,7 @@ import { ic } from './icons.js';
 import { pushCard } from './push.js';
 import { pinCard, hasPin } from './lock.js';
 import { bellButton, feedModal } from './feed.js';
+import { reportView } from './report.js';
 import { parentHomeworkCard, focusProgress, focusReportLine } from './focus.js';
 import { parentFoodCard, parentHealthSection, foodReportLines, foodMissions } from './food.js';
 
@@ -23,13 +24,14 @@ const noonOf = day => new Date(day + 'T12:00:00').toISOString();
 
 export function parentView() {
   const tab = state.tab || 'today';
-  const views = { today: todayTab, plan: planTab, progress: progressTab, gifts: giftsTab, settings: settingsTab };
+  const views = { today: todayTab, plan: planTab, progress: progressTab, gifts: giftsTab, settings: settingsTab, report: () => reportView(head) };
   const pending = state.d.attempts.filter(a => a.result == null).length + state.d.logs.filter(l => l.status === 'pending').length
     + state.d.redemptions.filter(r => r.status === 'claimed').length;
+  const navTab = tab === 'report' ? 'progress' : tab;
   const tabs = [['today', 'Today', ic.today(24)], ['plan', 'Plan', ic.mountain(24)], ['progress', 'Progress', ic.chart(24)], ['gifts', 'Rewards', ic.gift(24)], ['settings', 'Settings', ic.cog(24)]];
   return `<div class="screen parent">${(views[tab] || todayTab)()}</div>
     <nav class="tabbar" aria-label="Parent"><div class="inner">${tabs.map(([k, l, i]) =>
-      `<button data-act="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-current="${tab === k ? 'page' : 'false'}">${i}${k === 'today' && pending ? `<span class="badge">${pending}</span>` : ''}${l}</button>`).join('')}</div></nav>`;
+      `<button data-act="tab" data-tab="${k}" class="${navTab === k ? 'on' : ''}" aria-current="${navTab === k ? 'page' : 'false'}">${i}${k === 'today' && pending ? `<span class="badge">${pending}</span>` : ''}${l}</button>`).join('')}</div></nav>`;
 }
 
 const head = (title, sub = '') => `<header class="col tight"><span class="row between" style="width:100%"><span class="tag parent">Parent</span><span class="row" style="gap:8px">${hasPin() ? `<button class="btn sm ghost" style="min-height:36px" data-act="lockNow" aria-label="Lock the parent area">${ic.lock(14)} Lock</button>` : ''}${bellButton()}</span></span><span class="h1">${title}</span>${sub ? `<span class="small muted bold">${sub}</span>` : ''}</header>`;
@@ -258,7 +260,8 @@ function progressTab() {
       ${Object.entries(buckets).map(([k, v]) => `<div class="row"><span class="small bold" style="width:92px">${k}</span><div class="bar grow" style="height:12px"><div style="width:${Math.round(100 * v / maxB)}%;background:var(--teal)"></div></div><span class="small bold" style="width:18px">${v}</span></div>`).join('')}</section>
     ${focusProgress(from)}
     ${parentHealthSection(from)}
-    <button class="btn primary block" data-act="shareReport">${ic.share(18, '#fff')} Share report with his psychologist / ABA team</button>`;
+    <section class="card navy" style="gap:10px"><span class="h3" style="color:#fff">📊 Progress report</span><span class="small" style="opacity:.85">A visual report with charts and a written summary of how ${esc(kid())} is improving. Share it with his psychologist, ABA team or family, or save it as a PDF.</span>
+      <button class="btn primary block" data-act="openReport">Open the report</button></section>`;
 }
 
 function reportText() {

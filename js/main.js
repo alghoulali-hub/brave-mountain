@@ -35,9 +35,10 @@ async function start() {
   const { lockActions, lockView, lockOnStart, watchVisibility } = await import('./lock.js');
   const { feedActions } = await import('./feed.js');
   const { focusActions, startTicker } = await import('./focus.js');
+  const { reportActions } = await import('./report.js');
 
   const actions = {
-    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions, ...feedActions, ...focusActions,
+    ...authActions, ...childActions, ...parentActions, ...pushActions, ...foodActions, ...lockActions, ...feedActions, ...focusActions, ...reportActions,
     tab: el => { state.tab = el.dataset.tab; state.modal = null; render(); window.scrollTo(0, 0); },
     closeModal: () => { state.modal = null; render(); },
     async pinForgot() { state.locked = false; state.ui.lock = null; await actions.signOut(); toast('Sign in with your email and password.'); },

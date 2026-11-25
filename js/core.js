@@ -4,7 +4,7 @@ export const sb = window.supabase.createClient(cfg.url, cfg.key, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'brave-auth' }
 });
 export const KID_DOMAIN = 'kids.brave-family.app';
-export const APP_VERSION = '2.9 · 23 Nov';
+export const APP_VERSION = '3.0 · 25 Nov';
 
 export const state = {
   session: null,
